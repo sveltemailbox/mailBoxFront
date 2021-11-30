@@ -1,0 +1,27 @@
+[
+    {
+        "id": 1,
+        "to": 3,
+        "from": 4,
+        "subject": "subject 1",
+        "op": "op 1",
+        "body": "hey this is test body",
+        "created" : "2021-02-22T10:06:30.491Z",
+        "is_read": 0,
+        "is_starred": 0,
+        "folder": null,
+        "published": 1,
+        "tofk":{
+            "id": 3,
+            "first_name": "user(JS)", 
+            "last_name": null,
+            "user_name": "testuser"
+        },
+        "fromfk":{
+            "id": 4,
+            "first_name": "user(AS)", 
+            "last_name": null,
+            "user_name": "testuserAS"
+        }        
+    }
+]

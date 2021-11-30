@@ -1,0 +1,53 @@
+[
+    {
+        "id": 1,
+        "name": "FOLDER 1",
+        "user_id": 1,
+        "created": "aSDA",
+        "modified": null,
+        "color_code": 1,
+        "published": 1,
+        "color_codefk":{
+            "id": 1,
+            "text": "#ffffff",
+            "background": "#000000",
+            "created": "asdasdasd",
+            "modified": null,
+            "published": 1
+        }
+    },
+    {
+        "id": 1,
+        "name": "FOLDER 2",
+        "user_id": 1,
+        "created": "aSDA",
+        "modified": null,
+        "color_code": 1,
+        "published": 1,
+        "color_codefk":{
+            "id": 1,
+            "text": "#ffffff",
+            "background": "#000000",
+            "created": "asdasdasd",
+            "modified": null,
+            "published": 1
+        }
+    },
+    {
+        "id": 1,
+        "name": "FOLDER 3",
+        "user_id": 1,
+        "created": "aSDA",
+        "modified": null,
+        "color_code": 1,
+        "published": 1,
+        "color_codefk":{
+            "id": 1,
+            "text": "#ffffff",
+            "background": "#000000",
+            "created": "asdasdasd",
+            "modified": null,
+            "published": 1
+        }
+    }
+]
