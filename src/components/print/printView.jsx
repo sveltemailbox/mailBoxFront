@@ -1,9 +1,5 @@
 import React, { useEffect } from "react";
 import { formatDateTime } from "../../util/dateFormat/DateFormat";
-import MailBodyPrint from "../../views/mailview/MailBodyprint";
-import * as Api from "../../util/api/ApicallModule";
-import { ANNOTATION_ADD } from "../../config/constants";
-import { selectAndHighlightRange } from "../common/annotation";
 
 const PrintView = (props) => {
   useEffect(() => {
@@ -16,6 +12,7 @@ const PrintView = (props) => {
     popupWin.document.open();
     popupWin.document.write(
       `<html><head><title>Print Page</title>
+      <style>img{max-width: 100%; page-break-before: always;}</style>
        </head><body onload="window.print();" style="-webkit-print-color-adjust: exact;">
       <div id="printAnnotation">
       ${printContents}
@@ -73,8 +70,8 @@ const PrintView = (props) => {
   };
 
   const html = document
-    .getElementById("iframeResult")
-    .contentWindow.document.getElementById("selector").innerHTML;
+    ?.getElementById("iframeResult")
+    ?.contentWindow?.document?.getElementById("selector")?.innerHTML;
 
   return (
     <div
@@ -166,7 +163,15 @@ const PrintView = (props) => {
             marginBottom: 5,
           }}
         >
-          {`From: ${props?.sourceDesignation}(${props?.sourceBranch})`}
+          {"From:" + !props.sourceDesignation && !props?.sourceBranch
+            ? `-`
+            : !props.sourceDesignation && props?.sourceBranch
+            ? `${props?.sourceBranch}`
+            : props.sourceDesignation && !props?.sourceBranch
+            ? `${props.sourceDesignation}`
+            : props.sourceDesignation && props?.sourceBranch
+            ? `${props.sourceDesignation}(${props?.sourceBranch})`
+            : `-`}
         </span>
         <span
           style={{
@@ -186,7 +191,7 @@ const PrintView = (props) => {
       <div className="nk-ibx-reply-group">
         <div className="nk-ibx-reply-item">
           <div className={"nk-reply-body nk-ibx-reply-body is-shown"}>
-            <div className="row">
+            <div className="row ">
               {/* <MailBodyPrint
                 body={props.body}
                 call={props.call}
@@ -317,9 +322,7 @@ const PrintView = (props) => {
                           </td>
                           <td style={{ padding: "0px 20px" }}>
                             <div className="comment-time">
-                              {comment?.updatedTime
-                                ? formatDateTime(comment?.updatedTime)
-                                : formatDateTime(comment?.createdTime)}
+                              {formatDateTime(comment?.createdTime)}
                             </div>
                           </td>
                         </tr>

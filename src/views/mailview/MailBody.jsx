@@ -18,7 +18,14 @@ function MailBody({
 }) {
   let styleCode = `body{background-color:#ffff;}#iframeResult{background-color: #ffffff;height: 100%;width: 100%;}`;
   let colorcodeObj = {};
-
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
   const handleTextSelector = (backgr, color_id) => {
     handleHighlightButton(backgr, color_id);
   };
@@ -53,7 +60,7 @@ function MailBody({
       if (e?.target?.contentWindow != null) {
         myStopFunction();
         if (e?.target?.contentDocument?.body !== null) {
-          e.target.contentDocument.body.innerHTML = `<div id="selector">${e.target.contentDocument?.body?.innerHTML}</div><style>#selector{overflow-x: auto}img{page-break-before: always;width:100%;height:100%;}</style>`;
+          e.target.contentDocument.body.innerHTML = `<div id="selector">${e.target.contentDocument?.body?.innerHTML}</div><style>#selector{overflow-x: auto}img{page-break-before: always;max-width:100%;height:100%;}</style>`;
           var innerWindow =
             document?.getElementById("iframeResult")?.contentWindow;
           innerWindow.annoClick = annoClick;
@@ -83,16 +90,18 @@ function MailBody({
 
   const getAllAnnotation = async () => {
     let annotationData = [];
-    mailIds.forEach(async (item, index) => {
+    logDataFunction("ALL ANNOTATION MAIL", 0, 0);
+    mailIds?.forEach(async (item, index) => {
       const resp = await Api.ApiHandle(
         `${ANNOTATION_ADD}?mailid=${inboxMailData}`,
         "",
-        "GET"
+        "GET",
+        logData
       );
-      if (resp.status === 1) {
+      if (resp && resp?.status === 1) {
         annotationData.push(...resp.data);
       }
-      if (mailIds.length - 1 === index) {
+      if (mailIds?.length - 1 === index) {
         setGetAllAnnotationApi(true);
         setannoatationdata(annotationData);
         setAnnotation(annotationData);
@@ -102,10 +111,12 @@ function MailBody({
   };
 
   const getColorCode = async () => {
+    logDataFunction("COLOUR CODE", 0, 0);
     const resp = await Api.ApiHandle(
       `${GET_COLOR_CODE}?mailid=${mail_id}`,
       "",
-      "GET"
+      "GET",
+      logData
     );
     if (resp?.status === 1) {
       setColorCodeApi(true);

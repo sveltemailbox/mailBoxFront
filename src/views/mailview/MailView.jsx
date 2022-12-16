@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { connect } from "react-redux";
 import { Spinner, ProgressBar } from "react-bootstrap";
 import Commentbox from "../Commentbox";
@@ -6,7 +6,6 @@ import * as Api from "../../util/api/ApicallModule";
 import {
   GET_MAIL_BY_ID,
   UPDATE_MAIL_BY_ID,
-  GET_LIST_DESIGNATION,
   COMMENT_ON_MAIL,
   GET_PRE_DEFINED_COMMENTS,
   FREQUENT_ADDRESSES,
@@ -14,6 +13,8 @@ import {
   ANNOTATION_ADD,
   GET_ATTACHMENT_DETAILS,
   UNLINK_ATTACHMENT,
+  GET_MAIL_FOLDERS,
+  DOWNLOAD_ALL,
 } from "../../config/constants";
 import Axios from "axios";
 import fileDownload from "js-file-download";
@@ -30,7 +31,20 @@ import DocView from "./DocView";
 import Topreplaybuttons from "../Topreplaybuttons";
 import AddAttachment from "./AddAttachment";
 import ComposeTo from "../../components/common/compose_to";
-
+import { INGESTED_CONST_VALUES } from "../../util";
+import {
+  updateSentCall,
+  updateUnreadCall,
+  updateArchiveCall,
+  updateAllCall,
+  updateCrashedCall,
+  updateStarredCall,
+  updateAddToFolderCache,
+  updateFolderCachedData,
+} from "../../redux/action/InboxAction";
+import { LogApi } from "../../util/apiLog/LogApi";
+import Loader from "react-loader-spinner";
+import ReactToPrint from "react-to-print";
 const fileExtensionNames = [
   "png",
   "jpeg",
@@ -55,6 +69,11 @@ const MailView = ({
   uniqueMailId,
   setUniqueMailId,
   checkFlags,
+  total,
+  disablePreviousNext,
+  getPrevClick,
+  page,
+  noOfMails,
   ...props
 }) => {
   const commentBoxRef = useRef();
@@ -95,11 +114,34 @@ const MailView = ({
   const [designationId, setDesignationId] = useState(0);
   const [attachmentName, setAttachmentName] = useState("");
   const [attachment, setattachment] = useState([]);
+
   const [designationList, setDesignationList] = useState([]);
   const [bodyData, setBodyData] = useState("");
   const [viewDocument, setViewDocument] = useState(false);
   const [maildIdForComment, setMaildIdForComment] = useState("");
+  const [folderData, setFolderData] = useState([]);
+  const [allCommonAddresses, setAllCommonAddresses] = useState([]);
+  const [blankTo, setBlankTo] = useState(false);
+  const [apiFolderId, setApiFolderId] = useState();
+  const [nextDisabled, setNextDisabled] = useState(false);
+  const [prevDisabled, setPrevDisabled] = useState(false);
+  const limit = parseInt(localStorage.getItem("limit"));
+  const [callApi, setCallApi] = useState(false);
 
+  const [logAttachId, setLogAttacheId] = useState([]);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [folderClicked, setFolderClicked] = useState(false);
+  const [id, setId] = useState();
+  let attachId = [];
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
   const loadIframe = () => {
     setTimeout(() => {
       windowDoc =
@@ -112,12 +154,31 @@ const MailView = ({
   }, [generalCommentData]);
 
   useEffect(() => {
+    props.setBackButton(false);
+    props.setIsAction(false);
     // add when mounted
     document.addEventListener("mousedown", handleOpenFolderList);
     // return function to be called when unmounted
     return () => {
       document.removeEventListener("mousedown", handleOpenFolderList);
     };
+  }, []);
+
+  useEffect(() => {
+    const index = parseInt(localStorage.getItem("indexing"));
+    const pageLimit = parseInt(localStorage.getItem("limit"));
+    // const pageLimit = 20;
+    if (page === 1) {
+      props.setCountMail(index);
+      return;
+    }
+    if (index + 1 === pageLimit) {
+      props.setCountMail(page * (index + 1) - 1);
+      return;
+    } else {
+      props.setCountMail(limit * (page - 1) + index);
+      return;
+    }
   }, []);
 
   const handleOpenFolderList = (event, value) => {
@@ -143,14 +204,16 @@ const MailView = ({
   }, [props.mailId]);
 
   useEffect(() => {
+    if (props.selectedUserMailId) getForlderByMailId(props.selectedUserMailId);
+  }, [props.selectedUserMailId]);
+
+  useEffect(() => {
     if (maildIdForComment) getCommentData();
   }, [maildIdForComment]);
 
   useEffect(() => {
     loadIframe();
-    getListDesignation();
     getPreDefinedComments();
-    getFrequentAddresses();
 
     window.addEventListener("scroll", handleScroll, true);
   }, []);
@@ -163,6 +226,8 @@ const MailView = ({
       loadIframe();
     }
   }, [open]);
+
+  // useEffect(() => {}, [props.clicked, props.currentMailData]);
 
   useEffect(() => {
     annotationData();
@@ -178,63 +243,135 @@ const MailView = ({
     setDesignationId(designationId);
   }, [props?.userData]);
 
+  const typeCheck = (type, params, inbox) => {
+    type === "from" ? (inbox.fromAction = params) : (inbox.mailAction = params);
+  };
+
   const toggleStarred = async () => {
+    props.setIsAction(true);
+    const designationId = props?.userData?.designations.filter((item) => {
+      if (item.default_desig) return item;
+    })[0].id;
     let params = "";
+    let action = "";
+    let type = "";
+    if (designationId === mailData?.fromId) {
+      action = mailData?.fromAction;
+      type = "from";
+    } else {
+      action = mailData?.mailAction;
+      type = "to";
+    }
+
     setToggleStar((toggleStar) => !toggleStar);
-    switch (mailData.mailAction) {
+    logDataFunction(toggleStar ? "UNSTARRED" : "STARRED", mailData.id, 0);
+    switch (action) {
       case "99":
-        mailData.mailAction = "97";
-        params = "97";
+        params = "96";
+
         break;
       case "98":
-        mailData.mailAction = "96";
         params = "96";
         break;
       case "97":
-        mailData.mailAction = "99";
-        params = "99";
+        params = "98";
         break;
       case "96":
-        mailData.mailAction = "98";
         params = "98";
         break;
       case "89":
-        mailData.mailAction = "86";
-        params = "86";
+        params = "87";
         break;
       case "88":
-        mailData.mailAction = "87";
         params = "87";
         break;
       case "87":
-        mailData.mailAction = "88";
         params = "88";
         break;
       case "86":
-        mailData.mailAction = "89";
-        params = "89";
+        params = "88";
         break;
       case "79":
-        mailData.mailAction = "69";
-        params = "69";
-        break;
-      case "78":
-        mailData.mailAction = "68";
         params = "68";
         break;
+      case "78":
+        params = "68";
+
+        break;
       case "69":
-        mailData.mailAction = "79";
         params = "79";
         break;
       case "68":
-        mailData.mailAction = "78";
         params = "78";
+
         break;
 
+      case "99":
+        params = "98";
+
+        break;
+      case "97":
+        params = "96";
+
+        break;
+
+      case "89":
+        params = "88";
+
+        break;
+
+      case "86":
+        params = "87";
+
+        break;
+
+      case "79":
+        params = "78";
+
+        break;
+    }
+    typeCheck(type, params, mailData);
+
+    switch (props.isActiveModule) {
+      case "Unread":
+        props.updateAllCall(0);
+        props.updateCrashedCall(0);
+        props.updateStarredCall(0);
+        props.updateUnreadCall(0);
+
+        break;
+      case "Archive":
+        props.updateAllCall(0);
+        props.updateCrashedCall(0);
+        props.updateStarredCall(0);
+        props.updateArchiveCall(0);
+        break;
+      case "All":
+        props.updateAllCall(0);
+        props.updateCrashedCall(0);
+        props.updateStarredCall(0);
+        props.updateUnreadCall(0);
+        props.updateArchiveCall(0);
+
+        break;
+      case "Crashed":
+        props.updateAllCall(0);
+        props.updateStarredCall(0);
+        props.updateUnreadCall(0);
+        props.updateCrashedCall(0);
+        break;
+      case "Starred":
+        props.updateAllCall(0);
+        props.updateCrashedCall(0);
+        props.updateStarredCall(0);
+        props.updateUnreadCall(0);
+        props.updateArchiveCall(0);
+        break;
       default:
         break;
     }
-    await updateMail({ mail_action: params });
+
+    await updateMail({ mail_action: params, action_type: 1 });
   };
 
   useEffect(() => {
@@ -275,28 +412,42 @@ const MailView = ({
   };
 
   const getMail = async (mailId) => {
-    const resp = await Api.ApiHandle(`${GET_MAIL_BY_ID}/${mailId}`, "", "GET");
+    const designationId = props?.userData?.designations.filter((item) => {
+      if (item.default_desig) return item;
+    })[0].id;
+    logDataFunction("GET MAIL", mailId, 0);
 
-    if (resp.status === 1) {
-      let flags = checkFlags(resp?.data?.mail_action);
+    const resp = await Api.ApiHandle(
+      `${GET_MAIL_BY_ID}/${mailId}`,
+      "",
+
+      "GET",
+      logData
+    );
+    if (resp?.status === 1) {
+      let flags =
+        designationId === resp?.data?.From?.id
+          ? checkFlags(resp?.data?.from_action)
+          : checkFlags(resp?.data?.mail_action);
       let data = {
-        id: resp.data?.id,
-        userMailId: resp.data?.user_mail_id,
+        id: resp?.data?.id,
+        userMailId: resp?.data?.user_mail_id,
         mailAction: resp?.data?.mail_action,
-        toId: resp.data?.To?.id,
-        to: resp.data?.To?.designation,
-        toBranch: resp.data?.To?.branch,
-        from: resp.data?.From?.designation,
+        fromAction: resp?.data?.from_action,
+        toId: resp?.data?.To?.id,
+        to: resp?.data?.To?.designation,
+        toBranch: resp?.data?.To?.branch,
+        from: resp?.data?.From?.designation,
         fromId: resp?.data?.From?.id,
-        branch: resp.data?.From?.branch,
+        branch: resp?.data?.From?.branch,
         sourceId: resp?.data?.Mail?.Source?.id,
         sourceBranch: resp?.data?.Mail?.Source?.branch,
         sourceDesignation: resp?.data?.Mail?.Source?.designation,
         op: resp?.data?.Mail?.op,
-        subject: resp.data?.Mail?.subject,
-        createdAt: formatDateTime(resp.data?.Mail?.createdAt),
-        folders: resp.data?.Folder,
-        body: resp.bodyData?.body,
+        subject: resp?.data?.Mail?.subject,
+        createdAt: formatDateTime(resp?.data?.Mail?.createdAt),
+        folders: resp?.data?.Folder,
+        body: resp?.bodyData?.body,
         // isStarred: resp.data?.is_starred,
         // isCrashed: resp.data?.is_crashed,
         attachmentList: resp?.attachmentData,
@@ -304,11 +455,18 @@ const MailView = ({
         actualFormId: resp?.data?.From?.id,
         ToFolder: resp?.data?.ToFolder,
         FromFolder: resp?.data?.FromFolder,
+        // FirstName: resp?.data?.Mail.Source.designations?.first_name,
       };
+
+      setLogAttacheId(data.attachmentList);
+
       data = { ...data, ...flags };
       data.isStarred ? setToggleStar(true) : setToggleStar(false);
       setMaildIdForComment(data?.userMailId);
       setMailData(data);
+
+      setNextDisabled(false);
+      setPrevDisabled(false);
       renderImage(data.body).then((res) => {
         data.body = res;
         setMailData(data);
@@ -319,11 +477,12 @@ const MailView = ({
 
   const getCommentData = async () => {
     let _commentData = [];
-
+    logDataFunction("GET COMMENT ON MAIL", 0, 0);
     const resp = await Api.ApiHandle(
       `${GET_COMMENTS}/${maildIdForComment}`,
       "",
-      "GET"
+      "GET",
+      logData
     );
     if (resp?.status === 1) {
       resp?.data?.map((comment) => {
@@ -349,17 +508,86 @@ const MailView = ({
     }
   };
 
-  const handleSelectFolder = async (folderId) => {
-    await updateMail({ folder: folderId });
+  const handleSelectFolder = async (folder) => {
+    setFolderClicked(true);
+    props?.setIsMailAddedToFolder(true);
+    setIsLoading(true);
+    if (props?.folderCachedData) {
+      if (props?.folderCachedData[`'${folder.apiFolderId}'`] !== undefined) {
+        props?.updateAddToFolderCache(
+          props?.folderCachedData[`'${folder.apiFolderId}'`]
+        );
+      }
+    }
+
+    setFolderData((prev) => [
+      ...prev,
+      {
+        id: folder.apiFolderId,
+        name: folder.apiFolderName,
+        text: folder.apiColorCode,
+      },
+    ]);
+
+    let str;
+    let folderIds = [];
+    folderData.forEach((element) => {
+      folderIds.push(element.id);
+    });
+    folderIds.push(folder.apiFolderId);
+    str = folderIds.join(",");
+    logDataFunction("SELECT FOLDER", 0, 0);
+
+    await updateMail({ folder: str, action_type: 0 });
+
     await getMail(props?.mailId);
   };
 
   const updateMail = async (payload) => {
-    await Api.ApiHandle(`${UPDATE_MAIL_BY_ID}/${mailIds}`, payload, "put");
+    setIsLoading(true);
+    props?.setLoader(true);
+    payload.userMailId = mailData.userMailId;
+    // await Api.ApiHandle(
+    //   `${UPDATE_MAIL_BY_ID}/${mailIds}`,
+    //   payload,
+    //   "put",
+    //   logData
+    // );
+    const resp = await Api.ApiHandle(
+      `/api/mails/updateById/${mailIds}`,
+      payload,
+      "put",
+      logData
+    );
+
+    if (resp && resp.status === 1) {
+      props?.setLoader(false);
+      setFolderData(resp.data);
+      setIsLoading(false);
+      setFolderClicked(false);
+    }
+    // if (resp?.status === 1) {
+    //   setIsLoading(true);
+    //   setFolderClicked(false);
+    //   setCallApi(true);
+    // }
   };
 
-  const handleDeleteSelectedFolder = async () => {
-    await updateMail({ folder: null });
+  const handleDeleteSelectedFolder = async (id) => {
+    setFolderClicked(false);
+    props?.setIsAction(true);
+    setId(id);
+    let str;
+    let folderIds = [];
+    folderData.forEach((element) => {
+      if (element.id !== id) {
+        folderIds.push(element.id);
+      }
+    });
+    folderIds.length > 0 ? (str = folderIds.join(",")) : (str = null);
+
+    logDataFunction("DELETE SELECTED FOLDER", 0, 0);
+    await updateMail({ folder: str, action_type: 0 });
     await getMail(props?.mailId);
   };
 
@@ -376,12 +604,22 @@ const MailView = ({
   };
 
   const logprint = () => {
+    let attachment = [];
+
     setopenPrintcall(true);
     getMail(props?.mailId);
+
+    attachment = logAttachId.map((attachment) => {
+      return attachment.id;
+    });
+
+    logDataFunction("PRINT", props?.mailId, attachment);
+    LogApi(logData);
   };
 
   const backButton = () => {
     props.getAllMails("back");
+    props.setBackButton(true);
     setActiveModule("inbox");
   };
 
@@ -421,15 +659,17 @@ const MailView = ({
       }, 3000);
     } else {
       setDisableSendButton(true);
-      const designationId = props?.userData?.designations.filter((item) => {
-        if (item.default_desig) return item;
-      })[0].id;
+
       let attachmentIds = [];
       to?.forEach(async (toID) => {
         let payload = {
           to: toID.id,
           user_mail_id: props?.mailId,
+          from_action: mailData.fromAction,
+          mail_action: mailData.mailAction,
+          mail_id: mailData.userMailId,
         };
+
         if (toID?.id === immediateReply.id) {
           payload.action = "Reply";
         } else {
@@ -441,6 +681,7 @@ const MailView = ({
           attachment?.forEach((item) => {
             attachmentIds.push(item?.id);
           });
+
           payload.attachmentIds = attachmentIds;
           sendCommentApi(toID, payload);
         } else {
@@ -448,20 +689,31 @@ const MailView = ({
         }
       });
       setTo([]);
+      setBlankTo(true);
       setattachment([]);
 
       if (
-        props.inboxMailData.length > 1 &&
+        props?.currentMailData?.length > 1 &&
         props.filterOptions?.mail_action === "69"
       )
-        if (props?.filterOptions?.is_sent !== 1) {
+        if (
+          props?.filterOptions?.is_sent !== 1 &&
+          !props?.filterOptions?.by_stations &&
+          !props?.filterOptions.search_data
+        ) {
           openNextMail();
         }
     }
   };
 
   const sendCommentApi = async (toID, payload) => {
-    const resp = await Api.ApiHandle(`${COMMENT_ON_MAIL}`, payload, "POST");
+    logDataFunction("COMMENT", 0, 0);
+    const resp = await Api.ApiHandle(
+      `${COMMENT_ON_MAIL}`,
+      payload,
+      "POST",
+      logData
+    );
 
     if (resp.status !== 1) {
       Toaster("error", "Some error occurred");
@@ -470,47 +722,110 @@ const MailView = ({
       setInputCommentData("");
       Toaster(
         "success",
-        `Message sent successfully to ${toID.designation}(${toID.branch}) `
+        `Message sent successfully to ${toID?.designation}(${toID?.branch}) `
       );
       setDisableSendButton(false);
-
       setTo([]);
+      setBlankTo(false);
       topRef?.current?.scrollIntoView({ behavior: "smooth" });
+      props.updateSentCall(0);
       setRecentCommentid(inputCommentData);
+      if (props.isActiveModule === "Unread") {
+        if (
+          props.countmail + 1 === noOfMails ||
+          props.countmail + 1 === page * limit
+        ) {
+          return;
+        }
+        return props.countmail + 1 < noOfMails
+          ? props.setCountMail((prev) => prev + 1)
+          : props.setCountMail(noOfMails);
+      }
     }
   };
 
   const openNextMail = () => {
     let index = 0;
-    props.inboxMailData.forEach((mail, i) => {
-      if (mail.id === props.mailId) index = i + 1;
+    props?.currentMailData?.every((mail, i) => {
+      if (mail.id === props.mailId) {
+        index = i + 1;
+        return false;
+      }
+
+      return true;
     });
-    props.getMailId(props.inboxMailData[index]);
-    props.getAllMails("back");
+    if (index !== props?.currentMailData?.length) {
+      setUniqueMailId(props?.currentMailData[index]?.userMailId);
+      props?.getMailId(props?.currentMailData[index]);
+      localStorage.setItem("indexing", index);
+    }
+  };
+  const openPrevMail = () => {
+    const indexing = parseInt(localStorage.getItem("indexing"));
+    if (indexing === 0) {
+      setUniqueMailId(props?.currentMailData[limit - 1]?.userMailId);
+      props.getMailId(props?.currentMailData[limit - 1]);
+      localStorage.setItem("indexing", 14);
+      return;
+    } else {
+      let newIndex = indexing - 1;
+      setUniqueMailId(props?.currentMailData[newIndex]?.userMailId);
+      props.getMailId(props?.currentMailData[newIndex]);
+      localStorage.setItem("indexing", newIndex);
+    }
   };
 
-  const getListDesignation = async () => {
-    const designationId = props?.userData?.designations.filter((item) => {
-      if (item.default_desig) return item;
-    })[0].id;
-    const resp = await Api.ApiHandle(`${GET_LIST_DESIGNATION}`, "", "GET");
+  useMemo(() => {
+    if (props.countmail === (page - 1) * limit && props.clicked) {
+      props.setClicked(false);
+      openNextMail();
+      return;
+    }
+  }, [props.clicked]);
 
-    if (resp?.status === 1) {
-      setDesignationList(resp?.data);
+  useMemo(() => {
+    if (props.countmail + 1 === page * limit && props.prevCacheClicked) {
+      props.setPrevCacheClicked(false);
+      openPrevMail();
+      return;
+    }
+  }, [props.prevCacheClicked]);
 
-      const _options = [];
-      resp?.data?.map((list) => {
-        if (designationId !== list?.id) {
-          const options = {
-            value: `${list?.designation}-${list?.branch}`,
-            label: `${list?.designation}-${list?.branch}`,
-            id: list?.id,
-          };
-          _options.push(options);
-        }
-      });
+  useMemo(() => {
+    if (props?.countmail - 1 === page * limit && props?.prevCacheClicked) {
+      openPrevMail();
+      props?.setPrevCacheClicked(false);
+      return;
+    }
+  }, [props.prevCacheClicked]);
 
-      setOptions(_options);
+  const getPrevOnClick = async () => {
+    if (props?.countmail + 1 <= 1 || prevDisabled) {
+      return;
+    }
+    props?.setCountMail((prev) => prev - 1);
+
+    if (props?.countmail === (page - 1) * limit) {
+      props?.setPrevCacheClicked(true);
+      getPrevClick();
+      return;
+    } else {
+      openPrevMail();
+      return;
+    }
+  };
+  const getNextOnClick = async () => {
+    if (props.countmail + 1 === noOfMails || nextDisabled) {
+      return;
+    }
+    props?.setCountMail((prev) => prev + 1);
+    if (props?.countmail + 1 === page * limit) {
+      props?.setClicked(true);
+      await props?.getNextClick();
+      return;
+    } else {
+      openNextMail();
+      return;
     }
   };
 
@@ -525,7 +840,13 @@ const MailView = ({
   };
 
   const getPreDefinedComments = async () => {
-    const resp = await Api.ApiHandle(`${GET_PRE_DEFINED_COMMENTS}`, "", "GET");
+    logDataFunction("GET PRE-DEFINED COMMENT", 0, 0);
+    const resp = await Api.ApiHandle(
+      `${GET_PRE_DEFINED_COMMENTS}`,
+      "",
+      "GET",
+      logData
+    );
 
     if (resp?.status === 1) {
       const _preDefinedComments = [];
@@ -544,7 +865,14 @@ const MailView = ({
     const designation = props?.userData?.designations.filter((item) => {
       if (item.default_desig) return item;
     });
-    const resp = await Api.ApiHandle(FREQUENT_ADDRESSES, "", "GET");
+
+    logDataFunction("LIST OF FREQUENT ADDRESSES", 0, 0);
+    const resp = await Api.ApiHandle(
+      `${FREQUENT_ADDRESSES}?type=${props?.isMostFrequent}`,
+      "",
+      "GET",
+      logData
+    );
 
     if (resp?.status === 1) {
       const _commonAddresses = [];
@@ -554,6 +882,8 @@ const MailView = ({
             id: com?.id,
             branch: com?.branch,
             designation: com?.designation,
+            belongsTo: "commonAddresses",
+            // first_name: com?.first_name,
           };
           _commonAddresses.push(common);
         }
@@ -561,6 +891,7 @@ const MailView = ({
 
       setActualFrequentAddress(_commonAddresses);
       setCommonAddresses(_commonAddresses);
+      setAllCommonAddresses(_commonAddresses);
     }
   };
 
@@ -571,7 +902,6 @@ const MailView = ({
 
   const downlaodAttachment = (attachements) => {
     setSpinner({ bool: true, id: attachements.id });
-
     if (attachements?.url.includes("http://" || "https://")) {
       let url = "";
       if (attachements.host == null) {
@@ -579,6 +909,8 @@ const MailView = ({
       } else {
         url = attachements.host + attachements.url;
       }
+
+      logDataFunction("DOWNLOAD ATTACHMENT", props.mailId, [attachements.id]);
       let apiurl = `${process.env.REACT_APP_BASE_API_URL}/api/attachment/download/${attachements.id}`;
       let name = url.split("/");
       let headers = {};
@@ -586,7 +918,8 @@ const MailView = ({
       if (localStorage.getItem("auth")) {
         headers.Authorization = `Bearer ${localStorage.getItem("auth")}`;
       }
-      Axios.get(apiurl, { responseType: "blob", headers: headers })
+      LogApi(logData);
+      Axios.get(apiurl, { responseType: "blob", headers: headers }, "")
         .then(async (res) => {
           fileDownload(res.data, name[name.length - 1]);
           setSpinner(false);
@@ -596,6 +929,7 @@ const MailView = ({
           setSpinner(false);
         });
     } else {
+      logDataFunction("DOWNLOAD ATTACHMENT", props.mailId, [attachements.id]);
       let apiurl = `${process.env.REACT_APP_BASE_API_URL}/api/attachment/downloadfile/${attachements.id}`;
       let headers = {};
 
@@ -603,7 +937,8 @@ const MailView = ({
         headers.Authorization = `Bearer ${localStorage.getItem("auth")}`;
       }
 
-      Axios.get(apiurl, { responseType: "blob", headers: headers })
+      LogApi(logData);
+      Axios.get(apiurl, { responseType: "blob", headers: headers }, "")
         .then(async (res) => {
           fileDownload(res.data, attachements?.name);
           setSpinner(false);
@@ -615,8 +950,27 @@ const MailView = ({
     }
   };
 
+  const handleDownloadAll = async (attachementId) => {
+    let attachId = [];
+    attachementId.forEach(async function (attachements, i) {
+      attachId = [...attachId, attachements.id.toString()];
+    });
+    logDataFunction("DOWNLOAD ALL ATTACHMENT", props?.mailId, attachId);
+    LogApi(logData);
+    let id = attachId.toString();
+
+    const win = window.open(
+      `${process.env.REACT_APP_BASE_API_URL}/api/zipFile/downloadzip?attach_id=${id}&user_id=${props.userData.id}`,
+      "_blank"
+    );
+    win?.focus();
+    attachId = [];
+  };
+
   const viewAttachment = (attachements) => {
     if (attachements?.url.includes("http://" || "https://")) {
+      logDataFunction("VIEW ATTACHMENT", props.mailId, [attachements.id]);
+      LogApi(logData);
       let headers = {};
       if (localStorage.getItem("auth")) {
         headers.Authorization = `Bearer ${localStorage.getItem("auth")}`;
@@ -632,12 +986,14 @@ const MailView = ({
       const win = window.open(`${url}`, "_blank");
       win?.focus();
     } else {
+      logDataFunction("VIEW ATTACHMENT", props.mailId, [attachements.id]);
+
       let apiurl = `${process.env.REACT_APP_BASE_API_URL}/api/attachment/viewfile/${attachements.id}`;
       let headers = {};
       if (localStorage.getItem("auth")) {
         headers.Authorization = `Bearer ${localStorage.getItem("auth")}`;
       }
-
+      LogApi(logData);
       Axios.get(apiurl, {
         headers: headers,
       }).then(async (resp) => {
@@ -693,7 +1049,15 @@ const MailView = ({
         mailid: selectedtext.mail_id,
         mainMailId: uniqueMailId,
       };
-      const resp = await Api.ApiHandle(ANNOTATION_ADD, commentData, "POST");
+
+      logDataFunction("COMMENT ON ANNOTATION MAIL", 0, 0);
+
+      const resp = await Api.ApiHandle(
+        ANNOTATION_ADD,
+        commentData,
+        "POST",
+        logData
+      );
       if (resp?.status === 1) {
       }
       setshowAnnotationButtons(false);
@@ -707,10 +1071,13 @@ const MailView = ({
     setEndChar(end);
     let annotationData = [];
 
+    logDataFunction("CLICK ON ANNOTATION MAIL", 0, 0);
+
     const resp = await Api.ApiHandle(
       `${ANNOTATION_ADD}?mailid=${uniqueMailId}&start=${start}&end=${end}`,
       "",
-      "GET"
+      "GET",
+      logData
     );
     if (resp.status === 1) {
       annotationData.push(...resp.data);
@@ -727,14 +1094,17 @@ const MailView = ({
   };
 
   const viewDocAttchment = async (attachement) => {
+    logDataFunction("VIEW ATTACHEMENT DETAIL", 0, attachement.id);
+
     const resp = await Api.ApiHandle(
       `${GET_ATTACHMENT_DETAILS}?attId=${attachement.id}&document_id=${mailData.documentId}`,
       "",
-      "GET"
+      "GET",
+      logData
     );
     if (resp.status === 1) {
       setAttachmentName(attachement?.name);
-      setBodyData(resp?.data?.att_text);
+      setBodyData(resp?.data?.attch_Text);
       setViewDocument(!viewDocument);
     }
   };
@@ -765,9 +1135,15 @@ const MailView = ({
     return replyObject;
   };
 
+  const uniqueArray = (arr) =>
+    [...new Set(arr.map((o) => JSON.stringify(o)))].map((s) => JSON.parse(s));
+
   const replyButton = () => {
     let forReplyTo = setReplyButton(generalCommentData);
-    setTo((prev) => [...prev, forReplyTo]);
+    let arr = [...to, forReplyTo];
+    let arr1 = [];
+    arr1 = uniqueArray(arr);
+    setTo(arr1);
     setCommonAddresses(
       commonAddresses?.filter((item) => item?.id !== forReplyTo?.id)
     );
@@ -775,7 +1151,42 @@ const MailView = ({
 
   const handleRemoveAttachment = async (attach) => {
     setattachment(attachment?.filter((item) => item?.id !== attach?.id));
-    await Api.ApiHandle(`${UNLINK_ATTACHMENT}${attach?.id}`);
+
+    logDataFunction("UNLINK ATTACHMENT", props.mailId, [attach.id]);
+
+    await Api.ApiHandle(`${UNLINK_ATTACHMENT}${attach?.id}`, "", "", logData);
+  };
+
+  const getForlderByMailId = async (id) => {
+    logDataFunction("GET MAIL FOLDER", 0, 0);
+
+    const resp = await Api.ApiHandle(
+      `${GET_MAIL_FOLDERS}/${props?.mailId}`,
+      {},
+      "GET",
+      logData
+    );
+
+    if (resp && resp.status) {
+      setFolderData(resp.data);
+      setIsLoading(false);
+    }
+  };
+
+  const onClickReplyButton = (replyDesignation, designationId, action) => {
+    if (
+      !INGESTED_CONST_VALUES.includes(action) ||
+      (INGESTED_CONST_VALUES.includes(action) && generalCommentData.length > 0)
+    ) {
+      return (
+        Object.keys(replyDesignation).length > 0 &&
+        replyDesignation?.id !== +designationId && (
+          <div className="reply-button">
+            <Topreplaybuttons onClick={replyButton} />
+          </div>
+        )
+      );
+    }
   };
 
   return (
@@ -811,7 +1222,6 @@ const MailView = ({
                     </div>
                   </abbr>
                 </li>
-
                 <li
                   className="mr-n1 ml-2"
                   style={{ marginTop: 1, cursor: "pointer" }}
@@ -846,7 +1256,7 @@ const MailView = ({
                                 <li
                                   key={id}
                                   onClick={() => {
-                                    handleSelectFolder(folder?.apiFolderId);
+                                    handleSelectFolder(folder);
                                   }}
                                   style={{ cursor: "pointer" }}
                                 >
@@ -869,8 +1279,8 @@ const MailView = ({
                 )}
 
                 {props.filterOptions.is_sent !== 1 &&
-                  designationId !== mailData?.fromId && (
-                    <li className="mr-n1 ml-1" style={{ marginBottom: "7%" }}>
+                  designationId !== mailData?.sourceId && (
+                    <li className="mr-n1 ml-1" style={{ marginBottom: "5%" }}>
                       <abbr title="Star this message">
                         <div className="asterisk" onClick={toggleStarred}>
                           <a>
@@ -890,11 +1300,69 @@ const MailView = ({
                       </abbr>
                     </li>
                   )}
+                {mailData.attachmentList?.length > 0 && (
+                  <li
+                    className="mr-n1 ml-5"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => {
+                      handleDownloadAll(mailData.attachmentList);
+                    }}
+                  >
+                    <abbr title="Download All">
+                      <div className="btn btn-trigger btn-icon btn-tooltip">
+                        <em className="icon ni ni-download"></em>
+                      </div>
+                    </abbr>
+                  </li>
+                )}
               </ul>
             </div>
             <div className="nk-ibx-head-actions">
               <ul className="nk-ibx-head-tools g-1"></ul>
             </div>
+            <li
+              className="d-none d-sm-block"
+              style={{ marginLeft: "54.25rem" }}
+            >
+              <div className={"btn btn-icon btn-trigger btn-tooltip "}>
+                <em
+                  className="icon ni ni-chevron-left"
+                  style={{
+                    opacity: props.countmail + 1 <= 1 || prevDisabled ? 0.4 : 1,
+                  }}
+                  onClick={() => {
+                    setPrevDisabled(true);
+                    getPrevOnClick();
+                  }}
+                ></em>
+              </div>
+            </li>
+
+            <p style={{ marginBottom: "0px" }}>
+              {props.countmail + 1}/{noOfMails}
+            </p>
+
+            <li className="d-none d-sm-block">
+              <div
+                className={`btn btn-icon btn-trigger btn-tooltip 
+                
+                  `}
+              >
+                <em
+                  className="icon ni ni-chevron-right"
+                  style={{
+                    opacity:
+                      props.countmail + 1 === noOfMails || nextDisabled
+                        ? 0.4
+                        : 1,
+                  }}
+                  onClick={() => {
+                    setNextDisabled(true);
+                    getNextOnClick();
+                  }}
+                ></em>
+              </div>
+            </li>
           </div>
 
           <div
@@ -946,8 +1414,24 @@ const MailView = ({
                   </ul>
                   <ul className="list-inline" style={{ marginTop: "-5px" }}>
                     <li>
+                      {/* {mailData.branch === mailData.sourceBranch &&
+                      mailData.from === mailData.sourceDesignation
+                        ? "Source: "
+                        :  */}
                       From:{" "}
-                      {`${mailData?.sourceDesignation}(${mailData?.sourceBranch})`}
+                      {mailData?.sourceDesignation !== null &&
+                      mailData?.sourceBranch !== null
+                        ? `${mailData?.sourceDesignation}(${mailData?.sourceBranch})`
+                        : mailData?.sourceDesignation !== null &&
+                          mailData?.sourceBranch === null
+                        ? `${mailData?.sourceDesignation}`
+                        : mailData?.sourceDesignation === null &&
+                          mailData?.sourceBranch !== null
+                        ? `${mailData?.sourceBranch}`
+                        : mailData?.sourceDesignation === null &&
+                          mailData?.sourceBranch === null
+                        ? `-`
+                        : `-`}
                     </li>
                     {props?.filterOptions?.is_sent === 1 && (
                       <li>
@@ -960,159 +1444,170 @@ const MailView = ({
                       </li>
                     )}
                   </ul>
+                  {/* {mailData?.FirstName !== null &&
+                  mailData?.FirstName !== undefined ? (
+                    <ul className="list-inline" style={{ marginTop: "-12px" }}>
+                      <li>
+                        <i style={{ fontSize: "10px" }}>
+                          Source: {mailData?.FirstName}{" "}
+                        </i>
+                      </li>
+                    </ul>
+                  ) : null} */}
                 </div>
-                {props.filterOptions.is_sent !== 1 && (
-                  <ul className="nk-ibx-tags g-1">
-                    {mailData?.FromFolder &&
-                      mailData.actualFormId === designationId && (
+                <ul className="nk-ibx-tags g-1">
+                  {folderClicked ? (
+                    <li>
+                      <Loader
+                        type="ThreeDots"
+                        color="#6576ff"
+                        height={30}
+                        width={30}
+                      />
+                    </li>
+                  ) : (
+                    folderData?.length > 0 &&
+                    folderData?.map((data, i) => {
+                      return isLoading && id === data.id && !folderClicked ? (
                         <li
-                          className="btn-group is-tags"
+                          key={i}
+                          className="mr-2"
                           style={{
-                            color: mailData.FromFolder?.Color?.text,
-                            cursor: "pointer",
+                            display: "inline-block",
+                          }}
+                        >
+                          <Loader
+                            type="ThreeDots"
+                            color="#6576ff"
+                            height={30}
+                            width={30}
+                          />
+                        </li>
+                      ) : (
+                        <li
+                          key={i}
+                          className="btn-group is-tags folder-tags mr-2"
+                          style={{
+                            background: `${data?.text}`,
                           }}
                         >
                           <div
                             className="btn btn-xs btn btn-dim"
-                            style={{ color: mailData?.FromFolder?.Color?.text }}
+                            style={{ fontSize: 15 }}
                           >
-                            {mailData?.FromFolder?.name}
+                            {data?.name}
                           </div>
                           <div
                             className="btn btn-xs btn-icon btn btn-dim"
-                            style={{ color: mailData?.FromFolder?.Color?.text }}
+                            style={{ borderLeft: "1px solid white" }}
                           >
                             <em
                               className="icon ni ni-cross"
-                              onClick={handleDeleteSelectedFolder}
+                              onClick={() => {
+                                handleDeleteSelectedFolder(data.id);
+                              }}
                             ></em>
                           </div>
                         </li>
-                      )}
-
-                    {mailData?.ToFolder &&
-                      !(mailData.actualFormId === designationId) && (
-                        <li
-                          className="btn-group is-tags"
-                          style={{
-                            color: mailData.ToFolder?.Color?.text,
-                            cursor: "pointer",
-                          }}
-                        >
-                          <div
-                            className="btn btn-xs btn btn-dim"
-                            style={{ color: mailData?.ToFolder?.Color?.text }}
-                          >
-                            {mailData?.ToFolder?.name}
-                          </div>
-                          <div
-                            className="btn btn-xs btn-icon btn btn-dim"
-                            style={{ color: mailData?.ToFolder?.Color?.text }}
-                          >
-                            <em
-                              className="icon ni ni-cross"
-                              onClick={handleDeleteSelectedFolder}
-                            ></em>
-                          </div>
-                        </li>
-                      )}
-                  </ul>
-                )}
+                      );
+                    })
+                  )}
+                </ul>
               </div>
 
               <ul className="d-flex g-1" style={{ paddingRight: 21 }}>
                 {/* <li
-                  className="mr-n1"
-                  style={{ marginTop: 1, cursor: "pointer" }}
-                  onClick={() => {
-                    handleHistory();
-                  }}
-                >
-                  <abbr title="Track">
-                    <div className="btn btn-trigger btn-icon btn-tooltip">
-                      <em className="icon ni ni-navigate-fill"></em>
-                    </div>
-                  </abbr>
-                </li>
-
-                <li
-                  className="mr-n1 ml-2"
-                  style={{ marginTop: 1, cursor: "pointer" }}
-                  onClick={() => {
-                    logprint();
-                  }}
-                >
-                  <abbr title="Print">
-                    <div className="btn btn-trigger btn-icon btn-tooltip">
-                      <em className="icon ni ni-printer-fill"></em>
-                    </div>
-                  </abbr>
-                </li>
-                {props?.filterOptions?.is_sent !== 1 && (
-                  <li
-                    className="mr-n1 ml-1"
-                    onClick={(e) => handleOpenFolderList(e, 1)}
-                    ref={folderNode}
+                    className="mr-n1"
+                    style={{ marginTop: 1, cursor: "pointer" }}
+                    onClick={() => {
+                      handleHistory();
+                    }}
                   >
-                    <div className="my-dropdown-folder">
-                      <abbr title="Folder">
-                        <div className="btn btn-trigger btn-icon btn-tooltip">
-                          <em className="icon ni ni-folder-fill"></em>
-                        </div>
-                      </abbr>
-
-                      <div className="dropdown-content dropdown-folder-mail">
-                        <ul className="nk-ibx-label">
-                          {openFolderList &&
-                            props.folderList.map((folder, id) => {
-                              return (
-                                <li
-                                  key={id}
-                                  onClick={() => {
-                                    handleSelectFolder(folder?.apiFolderId);
-                                  }}
-                                  style={{ cursor: "pointer" }}
-                                >
-                                  <div>
-                                    <em
-                                      className="icon ni ni-folder-fill font-22"
-                                      style={{ color: folder?.apiColorCode }}
-                                    ></em>
-                                    <span className="nk-ibx-label-text">
-                                      {folder?.apiFolderName}
-                                    </span>
-                                  </div>
-                                </li>
-                              );
-                            })}
-                        </ul>
+                    <abbr title="Track">
+                      <div className="btn btn-trigger btn-icon btn-tooltip">
+                        <em className="icon ni ni-navigate-fill"></em>
                       </div>
-                    </div>
+                    </abbr>
                   </li>
-                )}
 
-                {props.filterOptions.is_sent !== 1 &&
-                  designationId !== mailData?.fromId && (
-                    <li className="mr-n1 ml-1">
-                      <abbr title="Star this message">
-                        <div className="asterisk" onClick={toggleStarred}>
-                          <a>
-                            <em
-                              className={`asterisk-${
-                                toggleStar ? "on" : "off"
-                              } icon ni ni-star${toggleStar ? "-fill" : ""}`}
-                              style={{
-                                position: "absolute",
-                                bottom: -12,
-                                cursor: "pointer",
-                                marginLeft: 4,
-                              }}
-                            ></em>
-                          </a>
+                  <li
+                    className="mr-n1 ml-2"
+                    style={{ marginTop: 1, cursor: "pointer" }}
+                    onClick={() => {
+                      logprint();
+                    }}
+                  >
+                    <abbr title="Print">
+                      <div className="btn btn-trigger btn-icon btn-tooltip">
+                        <em className="icon ni ni-printer-fill"></em>
+                      </div>
+                    </abbr>
+                  </li>
+                  {props?.filterOptions?.is_sent !== 1 && (
+                    <li
+                      className="mr-n1 ml-1"
+                      onClick={(e) => handleOpenFolderList(e, 1)}
+                      ref={folderNode}
+                    >
+                      <div className="my-dropdown-folder">
+                        <abbr title="Folder">
+                          <div className="btn btn-trigger btn-icon btn-tooltip">
+                            <em className="icon ni ni-folder-fill"></em>
+                          </div>
+                        </abbr>
+
+                        <div className="dropdown-content dropdown-folder-mail">
+                          <ul className="nk-ibx-label">
+                            {openFolderList &&
+                              props.folderList.map((folder, id) => {
+                                return (
+                                  <li
+                                    key={id}
+                                    onClick={() => {
+                                      handleSelectFolder(folder?.apiFolderId);
+                                    }}
+                                    style={{ cursor: "pointer" }}
+                                  >
+                                    <div>
+                                      <em
+                                        className="icon ni ni-folder-fill font-22"
+                                        style={{ color: folder?.apiColorCode }}
+                                      ></em>
+                                      <span className="nk-ibx-label-text">
+                                        {folder?.apiFolderName}
+                                      </span>
+                                    </div>
+                                  </li>
+                                );
+                              })}
+                          </ul>
                         </div>
-                      </abbr>
+                      </div>
                     </li>
-                  )} */}
+                  )}
+
+                  {props.filterOptions.is_sent !== 1 &&
+                    designationId !== mailData?.fromId && (
+                      <li className="mr-n1 ml-1">
+                        <abbr title="Star this message">
+                          <div className="asterisk" onClick={toggleStarred}>
+                            <a>
+                              <em
+                                className={`asterisk-${
+                                  toggleStar ? "on" : "off"
+                                } icon ni ni-star${toggleStar ? "-fill" : ""}`}
+                                style={{
+                                  position: "absolute",
+                                  bottom: -12,
+                                  cursor: "pointer",
+                                  marginLeft: 4,
+                                }}
+                              ></em>
+                            </a>
+                          </div>
+                        </abbr>
+                      </li>
+                    )} */}
               </ul>
             </div>
 
@@ -1220,7 +1715,6 @@ const MailView = ({
                     viewDocument={viewDocument}
                     attachmentName={attachmentName}
                   />
-
                   {mailData.attachmentList?.length > 0 && (
                     <div className="col-md-8">
                       <div className="attach-files">
@@ -1278,40 +1772,42 @@ const MailView = ({
                                     attactype[
                                       attactype.length - 1
                                     ].toLowerCase()
-                                  ) ? (
-                                    <span
-                                      onClick={() => viewAttachment(attachment)}
-                                      style={{
-                                        color: "blue",
-                                        cursor: "pointer",
-                                      }}
-                                    >
-                                      View
-                                    </span>
-                                  ) : (
-                                    ""
-                                  )}
+                                  )
+                                    ? attachment?.body_flag === 0 && (
+                                        <span
+                                          onClick={() =>
+                                            viewAttachment(attachment)
+                                          }
+                                          style={{
+                                            color: "blue",
+                                            cursor: "pointer",
+                                          }}
+                                        >
+                                          View
+                                        </span>
+                                      )
+                                    : ""}
 
                                   {attactype[1] &&
                                   docExtension.includes(
                                     attactype[
                                       attactype.length - 1
                                     ].toLowerCase()
-                                  ) ? (
-                                    <span
-                                      onClick={() =>
-                                        viewDocAttchment(attachment)
-                                      }
-                                      style={{
-                                        color: "blue",
-                                        cursor: "pointer",
-                                      }}
-                                    >
-                                      View
-                                    </span>
-                                  ) : (
-                                    ""
-                                  )}
+                                  )
+                                    ? attachment?.body_flag === 0 && (
+                                        <span
+                                          onClick={() =>
+                                            viewDocAttchment(attachment)
+                                          }
+                                          style={{
+                                            color: "blue",
+                                            cursor: "pointer",
+                                          }}
+                                        >
+                                          View
+                                        </span>
+                                      )
+                                    : ""}
 
                                   {attactype[1] &&
                                   (attactype[1] == "png" ||
@@ -1337,23 +1833,33 @@ const MailView = ({
                 </div>
               </div>
             </div>
-            {Object.keys(replyDesignation).length > 0 &&
-              replyDesignation?.id !== +designationId && (
-                <div className="reply-button">
-                  <Topreplaybuttons onClick={replyButton} />
-                </div>
-              )}
+            {props?.userData?.designations?.[0]?.id === mailData?.fromId
+              ? onClickReplyButton(
+                  replyDesignation,
+                  designationId,
+                  mailData.fromAction
+                )
+              : onClickReplyButton(
+                  replyDesignation,
+                  designationId,
+                  mailData.mailAction
+                )}
 
             {/* Comment Box in mailview */}
             <div ref={commentBoxRef} className="col-md-8">
               <div className="nk-ibx-reply-form nk-reply-form">
                 <ComposeTo
+                  options={options}
                   to={to}
                   setTo={setTo}
-                  designationList={designationList}
+                  placeholder="Enter the use Designation-Branch or Select from below..."
+                  setCommonAddresses={setCommonAddresses}
+                  mailId={props?.mailId}
+                  isClearable={true}
                   commonAddresses={commonAddresses}
+                  allCommonAddresses={allCommonAddresses}
                   handleFrequentAddresses={handleFrequentAddresses}
-                  isFullSize={true}
+                  blankTo={blankTo}
                 />
                 <div className="no-select">
                   <div className="nk-reply-form-editor">
@@ -1414,11 +1920,11 @@ const MailView = ({
                         </div>
                       );
                     })}
-                  {fileUploading && (
+                  {/* {fileUploading && (
                     <div>
                       <ProgressBar animated now={60} />
                     </div>
-                  )}
+                  )} */}
                   <div className="nk-reply-form-tools">
                     <ul className="nk-reply-form-actions g-1">
                       <li className="mr-2">
@@ -1428,17 +1934,35 @@ const MailView = ({
                           onClick={() => {
                             handleSendComment();
                           }}
-                          disabled={disableSendButton}
+                          disabled={disableSendButton || fileUploading}
                         >
                           Send
                         </button>
                       </li>
                       <li className="mr-2">
-                        <AddAttachment
-                          mailId={props?.mailId}
-                          setFileUploading={setFileUploading}
-                          setattachment={setattachment}
-                        />
+                        {!fileUploading && (
+                          <AddAttachment
+                            mailId={props?.mailId}
+                            setFileUploading={setFileUploading}
+                            setattachment={setattachment}
+                            attachment={attachment}
+                            isFileUploading={fileUploading}
+                          />
+                        )}
+                        {fileUploading && (
+                          <div
+                            className="spinner-border"
+                            role="status"
+                            style={{
+                              display: "inline-flex",
+                              justifyContent: "space-between",
+                              height: "1.5rem",
+                              width: "1.5rem",
+                            }}
+                          >
+                            <span className="sr-only">Loading...</span>
+                          </div>
+                        )}
                       </li>
                     </ul>
                   </div>
@@ -1464,6 +1988,19 @@ const MailView = ({
 const mapStateToProps = (state) => ({
   folderList: state.folderList,
   userData: state.userData,
+  isActiveModule: state.isActiveModule,
+  isMostFrequent: state.isMostFrequent,
 });
 
-export default connect(mapStateToProps)(MailView);
+const mapActionToProps = {
+  updateSentCall,
+  updateUnreadCall,
+  updateArchiveCall,
+  updateAllCall,
+  updateCrashedCall,
+  updateStarredCall,
+  updateAddToFolderCache,
+  updateFolderCachedData,
+};
+
+export default connect(mapStateToProps, mapActionToProps)(MailView);

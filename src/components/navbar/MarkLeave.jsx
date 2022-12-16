@@ -21,7 +21,14 @@ function MarkLeave({ setOperateMarkLeave, operateMarkLeave, ...props }) {
   const [leaveTo, setLeaveTo] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [disableSubmit, setDisableSubmit] = useState(false);
-
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
   useEffect(() => {
     getListDesignation();
     getLeave();
@@ -114,7 +121,14 @@ function MarkLeave({ setOperateMarkLeave, operateMarkLeave, ...props }) {
   };
 
   const getListDesignation = async () => {
-    const resp = await Api.ApiHandle(`${GET_LIST_DESIGNATION}`, "", "GET");
+    logDataFunction("DESIGNATION LIST", 0, 0);
+
+    const resp = await Api.ApiHandle(
+      `${GET_LIST_DESIGNATION}`,
+      "",
+      "GET",
+      logData
+    );
 
     if (resp?.status === 1) {
       const _options = [];

@@ -24,10 +24,16 @@ export default function EditorComponent(props) {
           props.updateContainerValue(editor.getContent());
         });
       },
+      plugins: "autoresize",
+      autoresize_min_height: 100,
+      autoresize_max_height: 1000,
+      autoresize_bottom_margin: 0,
       onchange_callback: "tinyChangeHandler",
       selector: "#mytextarea",
       base_url: "/tiny/",
-      height: 300,
+      // height: 440,
+      // maxHeight: 350,
+      // overflow: "auto",
       border: "0px",
       paste_data_images: true,
       menubar: false,
@@ -35,8 +41,7 @@ export default function EditorComponent(props) {
       plugins:
         " print preview paste importcss searchreplace autolink autosave save directionality code visualblocks visualchars fullscreen image media template codesample table charmap hr pagebreak nonbreaking anchor toc insertdatetime advlist lists imagetools textpattern noneditable help charmap quickbars emoticons",
       toolbar: "",
-      content_style:
-        "body { font-size:14px;}p{margin: 0px 0px; }img{width:100%}",
+      content_style: "body { font-size:14px;height:100vh;}p{margin: 0px 0px; }",
     });
     // tinymce.execCommand('mceInsertRawHTML', false, data);
   }, []);
@@ -74,6 +79,7 @@ export default function EditorComponent(props) {
         /> */}
       <textarea
         id="mytextarea"
+        onpaste="handleEditorChange()"
         style={{ height: "300px", width: "100%" }}
       ></textarea>
     </>

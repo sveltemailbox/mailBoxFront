@@ -172,6 +172,7 @@ pre[class*="language-"] {
 }
 /* stylelint-enable */
 .mce-content-body {
+  
   overflow-wrap: break-word;
   word-wrap: break-word;
 }

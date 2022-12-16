@@ -1,77 +1,77 @@
-import { useEffect, useState } from "react";
-import Modal from "react-awesome-modal";
-import { connect } from "react-redux";
+import { useEffect, useState } from 'react';
+import Modal from 'react-awesome-modal';
+import { connect } from 'react-redux';
 import {
   Button,
   OverlayTrigger,
   renderTooltip,
   Tooltip,
-} from "react-bootstrap";
+} from 'react-bootstrap';
 import {
   updateFolderList,
   updateIsActiveModule3Column,
   updateSortFilter,
-} from "../../redux/action/InboxAction";
+} from '../../redux/action/InboxAction';
 import {
   CREATE_FOLDER,
   EDIT_FOLDER,
   GET_ALL_MAIL,
   GET_FOLDER,
   REMOVE_FOLDER,
-} from "../../config/constants";
+} from '../../config/constants';
 // import Inbox from "./Inbox";
-import * as Api from "../../util/api/ApicallModule";
-import Toaster from "../../util/toaster/Toaster";
+import * as Api from '../../util/api/ApicallModule';
+import Toaster from '../../util/toaster/Toaster';
 
 const Sidebar = (props) => {
   const sidebarOptions = [
     {
-      id: "unread",
-      sidabarName: "Unread Mails",
-      icon: "inbox-fill",
+      id: 'unread',
+      sidabarName: 'Unread Mails',
+      icon: 'inbox-fill',
       count: props.unreadCount,
     },
     {
-      id: "archive",
-      sidabarName: "Archive Mails",
-      icon: "emails-fill",
+      id: 'archive',
+      sidabarName: 'Archive Mails',
+      icon: 'emails-fill',
     },
     {
-      id: "sent",
-      sidabarName: "Sent Mails",
-      icon: "send",
+      id: 'sent',
+      sidabarName: 'Sent Mails',
+      icon: 'send',
     },
     {
-      id: "crashed",
-      sidabarName: "Crash Mails",
-      icon: "briefcase",
+      id: 'crashed',
+      sidabarName: 'Crash Mails',
+      icon: 'briefcase',
     },
     {
-      id: "starred",
-      sidabarName: "Starred Mails",
-      icon: "star-fill",
+      id: 'starred',
+      sidabarName: 'Starred Mails',
+      icon: 'star-fill',
     },
   ];
 
   const defaultFolderList = [
     {
-      id: "",
-      folderName: "",
-      folderColor: "",
+      id: '',
+      folderName: '',
+      folderColor: '',
     },
   ];
 
   const [folder, setFolder] = useState(defaultFolderList);
   const [visiable, setVisiable] = useState(false);
-  const [selectedOption, setSelectedOption] = useState("unread");
+  const [selectedOption, setSelectedOption] = useState('unread');
   const [addFolder, setAddFolder] = useState(false);
-  const [folderName, setFolderName] = useState("");
+  const [folderName, setFolderName] = useState('');
   const [folderId, setFolderId] = useState(null);
   const [folderColor, setFolderColor] = useState(null);
   const [folderOptions, setFolderOptions] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [isEdit, setIsEdit] = useState(false);
-  // console.log(props);
+  // console.log(props, 'props');
   useEffect(async () => {
     if (props?.userData?.designations) getAllFolders();
   }, [props?.userData?.designations]);
@@ -86,10 +86,10 @@ const Sidebar = (props) => {
   };
 
   const closeModal = () => {
-    if (folderName === "") {
+    if (folderName === '') {
       setVisiable(false);
       setAddFolder(false);
-      setFolderName("");
+      setFolderName('');
       setFolderColor(null);
       setFolderId(null);
       setIsEdit(false);
@@ -104,7 +104,7 @@ const Sidebar = (props) => {
       setVisiable(false);
       setAddFolder(false);
       setFolder([..._folderList, ...folder]);
-      setFolderName("");
+      setFolderName('');
       setFolderColor(null);
       setFolderId(null);
       setIsEdit(false);
@@ -118,7 +118,7 @@ const Sidebar = (props) => {
       designation_id: props?.userData?.designations[0]?.id,
     };
 
-    const resp = await Api.ApiHandle(CREATE_FOLDER, payload, "POST");
+    const resp = await Api.ApiHandle(CREATE_FOLDER, payload, 'POST');
 
     if (resp.status === 1) {
       const folderResp = {
@@ -130,11 +130,11 @@ const Sidebar = (props) => {
       _folderList.push(folderResp);
       setAddFolder(false);
       setFolder([..._folderList, ...folder]);
-      setFolderName("");
-      Toaster("success", "Folder added successfully");
+      setFolderName('');
+      Toaster('success', 'Folder added successfully');
       props.updateFolderList([..._folderList, ...folder]);
     } else {
-      Toaster("error", `${resp?.message}`);
+      Toaster('error', `${resp?.message}`);
     }
   };
 
@@ -147,8 +147,8 @@ const Sidebar = (props) => {
     const apiData = [];
     const resp = await Api.ApiHandle(
       `${GET_FOLDER}${props?.userData?.designations[0]?.id}`,
-      "",
-      "GET"
+      '',
+      'GET'
     );
 
     if (resp.status === 1) {
@@ -185,7 +185,7 @@ const Sidebar = (props) => {
     const resp = await Api.ApiHandle(
       `${EDIT_FOLDER}${folderId}`,
       payload,
-      "PUT"
+      'PUT'
     );
 
     const folderData = {
@@ -199,33 +199,33 @@ const Sidebar = (props) => {
     if (resp.status === 1) {
       setAddFolder(false);
       setFolder([..._folderList, ...folder]);
-      setFolderName("");
+      setFolderName('');
       setFolderColor(null);
       setFolderId(null);
       setIsEdit(false);
-      Toaster("success", "Folder updated successfully");
+      Toaster('success', 'Folder updated successfully');
     } else {
       setAddFolder(false);
       setFolder([..._folderList, ...folder]);
-      setFolderName("");
+      setFolderName('');
       setFolderColor(null);
       setFolderId(null);
       setIsEdit(false);
 
-      Toaster("error", `${resp?.message}`);
+      Toaster('error', `${resp?.message}`);
     }
   };
 
   const handleRemoveFolder = async (i, id) => {
-    const resp = await Api.ApiHandle(`${REMOVE_FOLDER}${id}`, "", "DELETE");
+    const resp = await Api.ApiHandle(`${REMOVE_FOLDER}${id}`, '', 'DELETE');
 
     if (resp.status === 1) {
       folder.splice(i, 1);
       setFolder(folder);
       getAllFolders();
-      Toaster("success", "Folder removed successfully");
+      Toaster('success', 'Folder removed successfully');
     } else {
-      Toaster("error", `${resp?.message}`);
+      Toaster('error', `${resp?.message}`);
     }
   };
 
@@ -259,9 +259,9 @@ const Sidebar = (props) => {
               {sidebarOptions.map((bars, i) => {
                 return (
                   <li
-                    className={selectedOption === bars.id ? "active" : ""}
+                    className={selectedOption === bars.id ? 'active' : ''}
                     onClick={() => {
-                      props?.updateSortFilter("");
+                      props?.updateSortFilter('');
                       setSelectedOption(bars.id);
                       setFolderOptions(false);
                       props.onClick(bars.id);
@@ -281,12 +281,12 @@ const Sidebar = (props) => {
                       <span className="d-inline-block">
                         <div className="nk-ibx-menu-item">
                           <em className={`icon ni ni-${bars.icon}`}></em>
-                          {bars.id === "unread" ? (
+                          {bars.id === 'unread' ? (
                             <span className="nk-ibx-menu-text">
                               {bars.count}
                             </span>
                           ) : (
-                            ""
+                            ''
                           )}
                         </div>
                       </span>
@@ -329,10 +329,10 @@ const Sidebar = (props) => {
             <ul
               className="nk-ibx-menu"
               style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                paddingTop: "20%",
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                paddingTop: '20%',
               }}
             >
               <li>
@@ -357,7 +357,7 @@ const Sidebar = (props) => {
                   <li
                     key={`folderList${i}`}
                     id={fold.id}
-                    className={selectedOption === fold.id ? "active" : ""}
+                    className={selectedOption === fold.id ? 'active' : ''}
                     onClick={() => {
                       setFolderOptions(false);
                       setSelectedOption(fold.id);
@@ -381,8 +381,8 @@ const Sidebar = (props) => {
                     <div
                       className={
                         selectedOption === fold.id
-                          ? "moreVertIconShow"
-                          : "moreVertIcon"
+                          ? 'moreVertIconShow'
+                          : 'moreVertIcon'
                       }
                     >
                       <em
