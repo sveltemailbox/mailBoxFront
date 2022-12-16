@@ -46,7 +46,7 @@
 }
 .nk-ibx-item:not(:last-child) {
   border-bottom: 1px solid #ffff;
-  border-right: 1px solid #e5e9f2;
+  /* border-right: 1px solid #e5e9f2; */
 }
 .nk-ibx-head {
   padding: 13px 1.25rem;
@@ -125,7 +125,7 @@ body {
   }
   .nk-ibx-item,
   .nk-ibx-head {
-    border-right: 1px solid #e5e9f2;
+    /* border-right: 1px solid #e5e9f2;  */
   }
 }
 @media (min-width: 1200px) {
@@ -614,6 +614,11 @@ select:focus option:checked:hover {
   /* cursor: not-allowed !important; */
   pointer-events: none !important;
   opacity: 0.3;
+}
+.folder-name {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 @media print {

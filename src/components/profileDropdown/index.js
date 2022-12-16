@@ -2,26 +2,58 @@ import React, { useState } from "react";
 
 import { connect } from "react-redux";
 import { useHistory } from "react-router-dom";
-
+import { useSelector } from "react-redux";
 import * as Api from "../../util/api/ApicallModule";
 import { LOGOUT, SWITCH_USER } from "../../config/constants";
 import {
   updateActiveModule,
   updateSeachText,
+  updateUnreadMailsCount,
+  updateUserData,
+  updateUnreadCall,
+  updateSwitching,
+  updateArchiveCall,
+  updateAllCall,
+  updateSentCall,
+  updateCrashedCall,
+  updateStarredCall,
+  clearUnreadCache,
 } from "../../redux/action/InboxAction";
 import MarkLeave from "../navbar/MarkLeave";
 
 const ProfileDropdown = ({ showData, ...props }) => {
   const history = useHistory();
+  const role = useSelector((state) => state?.userData?.role);
 
   const [operateMarkLeave, setOperateMarkLeave] = useState(false);
-
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
   const signOut = async () => {
-    const resp = await Api.ApiHandle(LOGOUT, {}, "POST");
-
-    if (resp.status === 1) {
+    logDataFunction("LOGOUT", 0, 0);
+    const resp = await Api.ApiHandle(LOGOUT, {}, "POST", logData);
+    if (resp && resp.status === 1) {
       props.updateActiveModule("Unread");
+      props?.updateUnreadMailsCount(0);
+      props.updateUnreadCall(0);
+      props.updateAllCall(0);
+      props.updateArchiveCall(0);
+      props.updateAllCall(0);
+      props.updateSentCall(0);
+      props.updateCrashedCall(0);
+      props.updateStarredCall(0);
       props.updateSeachText("");
+      props.clearUnreadCache();
+      props.updateUserData({});
+      clearInterval(props.autoRefreshIntervalUnread);
+      clearInterval(props.autoRefreshIntervalAll);
+      clearInterval(props.autoRefreshIntervalCrashed);
+      localStorage.removeItem("_expiredTime");
       localStorage.removeItem("auth");
       history.push("/");
     }
@@ -39,20 +71,31 @@ const ProfileDropdown = ({ showData, ...props }) => {
     });
 
     props.setSwitchUserData({ name: usersInfo, isLoading: true });
-
+    logDataFunction("SWITCH USER", 0, 0);
     const resp = await Api.ApiHandle(
       SWITCH_USER,
       { designation_id: id, current_desgi_id: currentDesgiId },
-      "post"
+      "post",
+      logData
     );
 
     if (resp.status === 1) {
       props.setSwitchUser(true);
       props.setSwitchUserData({ name: {}, isLoading: false });
+      props.updateSwitching(true);
+
       props.updateActiveModule("Unread");
       localStorage.setItem("auth", resp.data);
       props.getUserData();
     }
+  };
+
+  const handleClick = () => {
+    const modal = document.getElementById("myModal");
+    const menu = document.querySelector(".dropdown-menu");
+    menu.style.display = "none";
+    console.log(menu);
+    modal.style.display = "block";
   };
 
   return (
@@ -116,10 +159,31 @@ const ProfileDropdown = ({ showData, ...props }) => {
             </div>
           </div>
 
+          {role ? (
+            <div className="seprator">
+              <div className="profile-button-usercard" onClick={""}>
+                <em
+                  style={{ marginRight: 5 }}
+                  className="icon ni ni-notes-alt"
+                ></em>
+                <span>Go To IMS</span>
+              </div>
+            </div>
+          ) : (
+            ""
+          )}
+
           <div className="seprator">
             <div
               className="profile-button-usercard"
-              onClick={() => history.push("/re_password")}
+              onClick={() =>
+                history.push({
+                  pathname: "/re_password",
+                  state: {
+                    showBackButton: true,
+                  },
+                })
+              }
             >
               <em
                 style={{ marginRight: 5 }}
@@ -128,6 +192,37 @@ const ProfileDropdown = ({ showData, ...props }) => {
               Change Password
             </div>
           </div>
+
+          {/* <div className="seprator">
+            <div
+              className="profile-button-usercard"
+              onClick={() =>
+                history.push({
+                  pathname: "/update_profile",
+                  state: {
+                    showBackButton: true,
+                  },
+                })
+              }
+            >
+              <em
+                style={{ marginRight: 5 }}
+                className="icon ni ni-user-alt"
+              ></em>
+              Update Profile
+            </div>
+          </div> */}
+          <div
+            className="seprator"
+            style={{ marginLeft: "10px" }}
+            onClick={handleClick}
+          >
+            <div className="help-section">
+              <span className="help-section-icon">?</span>
+              <span style={{ marginTop: 10 }}>Help</span>
+            </div>
+          </div>
+
           {/* <div className="seprator">
             <div
               className="profile-button-usercard"
@@ -160,6 +255,16 @@ const ProfileDropdown = ({ showData, ...props }) => {
 const mapActionToProps = {
   updateActiveModule,
   updateSeachText,
+  updateUnreadMailsCount,
+  updateUserData,
+  updateUnreadCall,
+  updateSwitching,
+  updateArchiveCall,
+  updateAllCall,
+  updateSentCall,
+  updateCrashedCall,
+  updateStarredCall,
+  clearUnreadCache,
 };
 
 const mapStateToProps = (state) => ({

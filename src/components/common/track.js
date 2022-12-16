@@ -9,7 +9,14 @@ import Loading from "../../util/loader/Loading";
 const Track = React.forwardRef((props, ref) => {
   const [data, setdata] = useState([]);
   const [loading, setloading] = useState(true);
-
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
   useEffect(() => {
     getMailshistory();
   }, []);
@@ -59,28 +66,32 @@ const Track = React.forwardRef((props, ref) => {
       selector: "forwardTo",
       sortable: false,
     },
+    { name: "Origin", selector: "origin", sortable: false },
   ];
 
   const getMailshistory = async () => {
+    logDataFunction("TRACK MAIL", 0, 0);
     setloading(true);
     const resp = await Api.ApiHandle(
       `${TRACK_MAIL}?mail_id=${props.mail_id}`,
       "",
-      "GET"
+      "GET",
+      logData
     );
 
     if (resp.status == 1) {
       setloading(false);
-      let track_data = resp.data.map(item=>{
+      let track_data = resp.data.map((item) => {
         let res_t = {
           fromUser: `${item.From.designation}(${item.From.branch})`,
           toUser: `${item.To.designation}(${item.To.branch})`,
           createdAt: item.createdAt,
           updatedAt: item.mail_read_time,
-          forwardTo: item.forward || ""
-        }
+          forwardTo: item.forward ?? "",
+          origin: item.origin_mail ? "Originator" : "-",
+        };
         return res_t;
-      })
+      });
 
       setdata(track_data);
     } else setloading(false);
@@ -109,7 +120,7 @@ const Track = React.forwardRef((props, ref) => {
               <em className="icon ni ni-cross-sm"></em>
             </span>
           </div>
-          <div className="modal-body p-0">
+          <div className="modal-body p-0 trackScroller">
             {/* <DataTableExtensions {...tableData} print={false} export={false}> */}
             <DataTable
               columns={columns}

@@ -156,30 +156,34 @@ function makeEditableAndHighlight(colour, comment) {
   documentselector?.execCommand("foreColor", false, "#17202A");
 
   if (!sel?.extentNode?.parentElement.hasAttribute("onclick")) {
-    sel.extentNode.parentElement.setAttribute(
-      "onclick",
-      `getannotationcomment(${start_gl},${end_gl});`
-    );
-    sel.extentNode.parentElement.parentElement.style.borderRadius = "5px";
-    sel.extentNode.parentElement.parentElement.style.padding = "0px 5px";
-    sel.extentNode.parentElement.parentElement.style.cursor = "pointer";
-    if (comment) {
-      sel.extentNode.parentElement.parentElement.style.textDecoration =
-        "underline";
+    if (sel && sel?.extentNode) {
+      sel.extentNode.parentElement.setAttribute(
+        "onclick",
+        `getannotationcomment(${start_gl},${end_gl});`
+      );
+      sel.extentNode.parentElement.parentElement.style.borderRadius = "5px";
+      sel.extentNode.parentElement.parentElement.style.padding = "0px 5px";
+      sel.extentNode.parentElement.parentElement.style.cursor = "pointer";
+      if (comment) {
+        sel.extentNode.parentElement.parentElement.style.textDecoration =
+          "underline";
+      }
     }
   }
-  if (!sel.baseNode.parentElement.hasAttribute("onclick")) {
-    sel.baseNode.parentElement.setAttribute(
-      "onclick",
-      `getannotationcomment(${start_gl},${end_gl});`
-    );
+  if (!sel?.baseNode.parentElement.hasAttribute("onclick")) {
+    if (sel && sel?.baseNode) {
+      sel.baseNode.parentElement.setAttribute(
+        "onclick",
+        `getannotationcomment(${start_gl},${end_gl});`
+      );
 
-    sel.baseNode.parentElement.parentElement.style.borderRadius = "5px";
-    sel.baseNode.parentElement.parentElement.style.padding = "0px 5px";
-    sel.baseNode.parentElement.parentElement.style.cursor = "pointer";
-    if (comment) {
-      sel.baseNode.parentElement.parentElement.style.textDecoration =
-        "underline ";
+      sel.baseNode.parentElement.parentElement.style.borderRadius = "5px";
+      sel.baseNode.parentElement.parentElement.style.padding = "0px 5px";
+      sel.baseNode.parentElement.parentElement.style.cursor = "pointer";
+      if (comment) {
+        sel.baseNode.parentElement.parentElement.style.textDecoration =
+          "underline ";
+      }
     }
   }
 

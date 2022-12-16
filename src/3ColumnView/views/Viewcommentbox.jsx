@@ -123,14 +123,11 @@ const Viewcommentbox = (props) => {
       setTo([]);
       setLoading(true);
       getMail(props?.mailId);
-      // updateMailOnComment(props.mailId);
 
-      getListDesignation();
       getPreDefinedComments();
       getCommentData();
       getFrequentAddresses();
       setshowAnnotationButtons(false);
-      // getAllAnnotation();
     }
   }, [props.mailId]);
 
@@ -257,7 +254,7 @@ const Viewcommentbox = (props) => {
 
   const getFrequentAddresses = async () => {
     const resp = await Api.ApiHandle(
-      `${FREQUENT_ADDRESSES}${userData[0]?.id}`,
+      `${FREQUENT_ADDRESSES}${userData[0]?.id}?type=${props?.isMostFrequent}`,
       "",
       "GET"
     );

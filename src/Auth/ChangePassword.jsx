@@ -8,8 +8,13 @@ import Toaster from "../util/toaster/Toaster";
 import {
   updateActiveModule,
   updateSeachText,
+  updateUnreadMailsCount,
 } from "../redux/action/InboxAction";
 import { connect } from "react-redux";
+import { validatePassword } from "../util";
+import PasswordValidationFrame from "../components/common/password_validation_frame";
+import Loader from "react-loader-spinner";
+import HelpModal from "../components/common/HelpModal";
 
 const ChangePassword = (props) => {
   const history = useHistory();
@@ -20,9 +25,17 @@ const ChangePassword = (props) => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [rePassword, setRePassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState("");
-
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
   const handleChangePassword = async (e) => {
     e.preventDefault();
     const payload = {
@@ -41,29 +54,51 @@ const ChangePassword = (props) => {
     } else if (newPassword !== rePassword) {
       setError(`* The new password and confirmation password do not match.`);
     } else {
-      const resp = await Api.ApiHandle(`${CHANGE_PASSWORD}`, payload, "PUT");
+      setError("");
+      setLoading(true);
 
-      if (resp.status === 1) {
-        Toaster("success", "Password changed successfully");
-        setError("");
-        setNewPassword("");
-        setOldPassword("");
-        setRePassword("");
-        signOut();
+      let checkPasswordStrength = true;
+
+      Object.values(validatePassword(newPassword)).forEach((item) => {
+        if (!item) checkPasswordStrength = false;
+      });
+
+      if (checkPasswordStrength) {
+        logDataFunction("CHANGE PASSWORD", 0, 0);
+        const resp = await Api.ApiHandle(
+          `${CHANGE_PASSWORD}`,
+          payload,
+          "PUT",
+          logData
+        );
+        if (resp.status === 1) {
+          Toaster("success", "Password changed successfully");
+          setError("");
+          setNewPassword("");
+          setOldPassword("");
+          setRePassword("");
+          signOut();
+        } else {
+          setLoading(false);
+          Toaster("error", resp.message);
+        }
       } else {
-        setError("* Your current password do not match");
+        setLoading(false);
+        Toaster("error", "Enter password that satisfy all requirement");
       }
     }
   };
 
   const signOut = () => {
-    let logData = {
-      type: "PASSWORD CHANGE LOGOUT",
-    };
-    Api.ApiHandle(LOGS_ADD, logData, "POST");
+    // let logData = {
+    //   type: "PASSWORD CHANGE LOGOUT",
+    // };
+    // Api.ApiHandle(LOGS_ADD, logData, "POST");
     props.updateActiveModule("Unread");
     props.updateSeachText("");
+    props?.updateUnreadMailsCount(0);
     localStorage.removeItem("auth");
+    localStorage.removeItem("_expiredTime");
     history.push("/");
   };
 
@@ -75,16 +110,23 @@ const ChangePassword = (props) => {
             <div style={{ marginBottom: 60 }}>
               <Navbar />
             </div>
+            <HelpModal />
             <div style={{ display: "flex" }}>
-              <em
-                className="icon ni ni-arrow-left"
-                style={{ marginRight: "106%", marginLeft: "-112%" }}
-                onClick={() => {
-                  history.push("/mail");
-                  props.updateActiveModule("Unread");
-                }}
-              ></em>
-              <h5 className="nk-block-title">Change Password</h5>
+              {props.location.state && (
+                <em
+                  className="icon ni ni-arrow-left"
+                  style={{ marginRight: "106%", marginLeft: "-112%" }}
+                  onClick={() => {
+                    history.push("/mail");
+                    props.updateActiveModule("Unread");
+                  }}
+                />
+              )}
+              <h5 className="nk-block-title">
+                {props.location.state
+                  ? "Change Password"
+                  : "Create New Password"}
+              </h5>
             </div>
           </div>
         </div>
@@ -146,6 +188,9 @@ const ChangePassword = (props) => {
               )}
             </div>
           </div>
+          {newPassword && (
+            <PasswordValidationFrame password={validatePassword(newPassword)} />
+          )}
           <div className="form-group">
             <label className="form-label" htmlFor="re_password">
               Confirm New Password
@@ -182,7 +227,13 @@ const ChangePassword = (props) => {
             }}
           >
             <button className="btn btn-lg btn-primary btn-block">
-              Update Password
+              {loading ? (
+                <Loader type="ThreeDots" color="#FFF" height={20} width={20} />
+              ) : props.location.state ? (
+                "Update Password"
+              ) : (
+                "Create Password"
+              )}
             </button>
           </div>
         </form>
@@ -193,6 +244,7 @@ const ChangePassword = (props) => {
 
 const mapActionToProps = {
   updateActiveModule,
+  updateUnreadMailsCount,
   updateSeachText,
 };
 

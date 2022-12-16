@@ -1,54 +1,37 @@
 import React, { useState, useEffect } from "react";
 import Modal from "react-awesome-modal";
 import { connect } from "react-redux";
-import Select from "react-select";
 import {
   COMMENT_ON_MAIL,
   FREQUENT_ADDRESSES,
-  GET_LIST_DESIGNATION,
   GET_PRE_DEFINED_COMMENTS,
 } from "../../config/constants";
 import * as Api from "../../util/api/ApicallModule";
 import Toaster from "../../util/toaster/Toaster";
 import ComposeTo from "../common/compose_to";
+import { updateSentCall } from "../../redux/action/InboxAction";
 
 function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
-  const [options, setOptions] = useState([]);
   const [to, setTo] = useState([]);
   const [commonAddresses, setCommonAddresses] = useState([]);
+  const [allCommonAddresses, setAllCommonAddresses] = useState([]);
   const [preDefinedComments, setPreDefinedComments] = useState([]);
   const [actualFrequentAddress, setActualFrequentAddress] = useState([]);
   const [disableSendButton, setDisableSendButton] = useState(false);
   const [designationList, setDesignationList] = useState([]);
   const [inputCommentData, setInputCommentData] = useState("");
-
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
   useEffect(() => {
-    getListDesignation();
     getFrequentAddresses();
     getPreDefinedComments();
   }, []);
-
-  const getListDesignation = async () => {
-    const resp = await Api.ApiHandle(`${GET_LIST_DESIGNATION}`, "", "GET");
-
-    if (resp?.status === 1) {
-      setDesignationList(resp?.data);
-
-      const _options = [];
-      resp?.data?.map((list) => {
-        if (props?.userData?.id !== list?.id) {
-          const options = {
-            value: `${list?.designation}-${list?.branch}`,
-            label: `${list?.designation}-${list?.branch}`,
-            id: list?.id,
-          };
-          _options.push(options);
-        }
-      });
-
-      setOptions(_options);
-    }
-  };
 
   const handleToData = (selected, unselected) => {
     setTo(selected);
@@ -74,6 +57,7 @@ function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
 
   const handleFrequentAddresses = (common, id) => {
     setTo((prev) => [...prev, common]);
+
     setCommonAddresses(commonAddresses.filter((item) => item?.id !== id));
   };
 
@@ -81,9 +65,10 @@ function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
     const designation = props?.userData?.designations?.filter((item) => {
       if (item.default_desig) return item;
     });
-    const resp = await Api.ApiHandle(FREQUENT_ADDRESSES, "", "GET");
+    logDataFunction("LIST OF FREQUENT ADDRESSES", 0, 0);
+    const resp = await Api.ApiHandle(`${FREQUENT_ADDRESSES}?type=${props?.isMostFrequent}`, "", "GET", logData);
 
-    if (resp?.status === 1) {
+    if (resp && resp?.status === 1) {
       const _commonAddresses = [];
       resp?.data?.map((com) => {
         if (designation?.designation !== com?.designation) {
@@ -91,6 +76,7 @@ function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
             id: com?.id,
             branch: com?.branch,
             designation: com?.designation,
+            belongsTo: "commonAddresses",
           };
           _commonAddresses.push(common);
         }
@@ -98,6 +84,7 @@ function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
       setActualFrequentAddress(_commonAddresses);
 
       setCommonAddresses(_commonAddresses);
+      setAllCommonAddresses(_commonAddresses);
     }
   };
 
@@ -106,9 +93,15 @@ function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
   };
 
   const getPreDefinedComments = async () => {
-    const resp = await Api.ApiHandle(`${GET_PRE_DEFINED_COMMENTS}`, "", "GET");
+    logDataFunction("GET PRE-DEFINED COMMENT", 0, 0);
+    const resp = await Api.ApiHandle(
+      `${GET_PRE_DEFINED_COMMENTS}`,
+      "",
+      "GET",
+      logData
+    );
 
-    if (resp?.status === 1) {
+    if (resp && resp?.status === 1) {
       const _preDefinedComments = [];
       resp?.data?.map((com) => {
         const comments = {
@@ -136,28 +129,42 @@ function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
       }, 3000);
     } else {
       setDisableSendButton(true);
+      let payload = {};
 
       to?.forEach(async (toID, toIndex) => {
         props.selectedMail.map(async (user_mail_id, mailIndex) => {
           if (inputCommentData === "") {
-            var payload = {
+            payload = {
               to: toID.id,
               user_mail_id: user_mail_id,
+              mail_action: props.selectedMailData[mailIndex].mailAction,
+              from_action: props.selectedMailData[mailIndex].fromAction,
+              mail_id: props.selectedMailData[mailIndex].userMailId,
+              action: "Forward",
             };
           } else {
-            var payload = {
+            payload = {
               to: toID.id,
               user_mail_id: user_mail_id,
               comment: inputCommentData,
+              mail_action: props.selectedMailData[mailIndex].mailAction,
+              from_action: props.selectedMailData[mailIndex].fromAction,
+              mail_id: props.selectedMailData[mailIndex].userMailId,
+              action: "Forward",
             };
           }
+
+          // setDisableSendButton(false);
+
+          logDataFunction("COMMENT", 0, 0);
           const resp = await Api.ApiHandle(
             `${COMMENT_ON_MAIL}`,
             payload,
-            "POST"
+            "POST",
+            logData
           );
 
-          if (resp.status !== 1) {
+          if (resp && resp.status !== 1) {
             if (mailIndex === props.selectedMail.length - 1) {
               Toaster("error", "Some error occurred");
               setDisableSendButton(false);
@@ -174,6 +181,7 @@ function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
               setDisableSendButton(false);
               setTo([]);
               setOperateForwardTo(false);
+              props.updateSentCall(0);
             }
           }
         });
@@ -203,7 +211,7 @@ function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
                 }}
               ></em>
             </div>
-            <hr></hr>
+            <hr style={{ marginBottom: "0rem" }}></hr>
             {/* to for the comment */}
 
             <ComposeTo
@@ -211,6 +219,8 @@ function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
               designationList={designationList}
               setTo={setTo}
               commonAddresses={commonAddresses}
+              setCommonAddresses={setCommonAddresses}
+              allCommonAddresses={allCommonAddresses}
               handleFrequentAddresses={handleFrequentAddresses}
               isFullSize={true}
             />
@@ -265,8 +275,13 @@ function ForwardTo({ setOperateForwardTo, operateForwardTo, ...props }) {
   );
 }
 
+const mapActionToProps = {
+  updateSentCall,
+};
+
 const mapStateToProps = (state) => ({
   userData: state.userData,
+isMostFrequent:state.isMostFrequent
 });
 
-export default connect(mapStateToProps)(ForwardTo);
+export default connect(mapStateToProps, mapActionToProps)(ForwardTo);

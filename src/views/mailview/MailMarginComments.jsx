@@ -18,7 +18,14 @@ function MailMarginComments(props) {
   const [endChar, setEndChar] = useState("");
   const [beforeSelectedHandle, setBeforeSelectedHandle] = useState(0);
   const [designation, setDesignation] = useState(0);
-
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
   useEffect(() => {
     const designation = props?.userData?.designations.filter((item) => {
       if (item.default_desig) return item;
@@ -78,9 +85,9 @@ function MailMarginComments(props) {
           branchName: res.anno_from.branch,
           commentData: res.anno_comment,
           color: res?.Color?.background,
-          time: new Date(res.createdAt).toLocaleTimeString(),
+          time: new Date(res.createdAt).toLocaleTimeString("en-GB"),
           // updatedAt: new Date(res.updatedAt).toLocaleTimeString(),
-          date: new Date(res.createdAt).toLocaleDateString(),
+          date: new Date(res.createdAt).toLocaleDateString("en-GB"),
         };
         comment.push(data);
       }
@@ -96,8 +103,8 @@ function MailMarginComments(props) {
     if (props?.selectedAnnotation.length > 0 || selectedtext.text.length > 0) {
       selectedtext.color_id = props?.colorID;
 
-      const time = new Date().toLocaleTimeString();
-      const date = new Date().toLocaleDateString();
+      const time = new Date().toLocaleTimeString("en-GB");
+      const date = new Date().toLocaleDateString("en-GB");
       setMarginCommentData("");
       let commentData = {};
 
@@ -123,7 +130,13 @@ function MailMarginComments(props) {
       setStartChar(commentData?.start_char);
       setEndChar(commentData?.end_char);
 
-      const resp = await Api.ApiHandle(ANNOTATION_ADD, commentData, "POST");
+      logDataFunction("SUBMIT COMMENT ON ANNOTATION MAIL", 0, 0);
+      const resp = await Api.ApiHandle(
+        ANNOTATION_ADD,
+        commentData,
+        "POST",
+        logData
+      );
       if (resp.status === 1) {
         const comment = {
           id: resp.data.id,
@@ -149,11 +162,12 @@ function MailMarginComments(props) {
       anno_comment: marginCommentData,
       id: editCommentId,
     };
-
+    logDataFunction("UPDATE COMMENT ON ANNNOTATION MAIL", 0, 0);
     const resp = await Api.ApiHandle(
       `${ANNOTATION}/${editCommentId}`,
       params,
-      "PUT"
+      "PUT",
+      logData
     );
 
     if (resp.status === 1) {
@@ -180,10 +194,12 @@ function MailMarginComments(props) {
       mailid: data.mailid,
       id: data.id,
     };
+    logDataFunction("DELETE COMMENT ON ANNOTATION MAIL", 0, 0);
     const resp = await Api.ApiHandle(
       `${ANNOTATION}/${data.id}`,
       params,
-      "delete"
+      "delete",
+      logData
     );
 
     if (resp.status === 1) {
@@ -199,7 +215,14 @@ function MailMarginComments(props) {
       start_char: startChar === "" ? props?.startChar : startChar,
       end_char: endChar === "" ? props?.endChar : endChar,
     };
-    const resp = await Api.ApiHandle(`${ANNOTATION_ADD}`, params, "delete");
+    logDataFunction("DELETE ANNOTATION MAIL", 0, 0);
+
+    const resp = await Api.ApiHandle(
+      `${ANNOTATION_ADD}`,
+      params,
+      "delete",
+      logData
+    );
     if (resp.status === 1) {
       props?.setOpen("delete");
     } else {
@@ -291,7 +314,7 @@ function MailMarginComments(props) {
                           }}
                           className="d-flex justify-content-between"
                         >
-                          <span className="lead-text">{`${designation.designation}(${designation.branch})`}</span>
+                          <span className="lead-text">{`${notes?.designationName}(${notes.branchName})`}</span>
                           {!notes?.enb_sent && (
                             <div>
                               <em
@@ -314,8 +337,8 @@ function MailMarginComments(props) {
                         <hr></hr>
                         <div>
                           <ul className="list-inline d-flex justify-content-end">
-                            <li>{notes.updatedAt || notes.time}</li>
                             <li>{notes.date}</li>
+                            <li>{notes.updatedAt || notes.time}</li>
                           </ul>
                         </div>
                       </div>

@@ -1,20 +1,20 @@
 name: remote ssh command
 on:
   push:
-    branches: [ thread ]
+    branches: [version_2.5.0]
 jobs:
-
   build:
     name: Deploy
     runs-on: ubuntu-latest
     steps:
-    - name: executing remote ssh commands using password
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        password: ${{ secrets.PASSWORD }}
-        script: |
-          cd thread/Mailbox-front/
-          git pull origin thread
-          pm2 restart 2
+      - name: executing remote ssh commands using password
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          script: |
+            cd thread/Mailbox-front/
+            git pull origin version_2.5.0
+            pm2 restart 1

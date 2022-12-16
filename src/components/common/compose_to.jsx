@@ -1,22 +1,46 @@
 import React, { useEffect, useRef, useState } from "react";
 import { connect } from "react-redux";
+import { GET_ALL_BRANCH } from "../../config/constants";
+import { ApiHandle } from "../../util/api/ApicallModule";
+import Loader from "react-loader-spinner";
 import "./compose_to.css";
 
 function ComposeTo(props) {
   const closeWinRef = useRef(null);
-  let isFullSize = props?.isFullSize ? 5 : 2;
+  let isFullSize = props?.isFullSize ? 8 : 2;
+  let commonAddresses = [...props?.commonAddresses];
   const [ownBranchDesignationList, setOwnBranchDesignationList] = useState([]);
-  const [otherBranches, setOtherBranches] = useState([]);
+  const [otherBranches, setOtherBranches] = useState({});
   const [operateDesignationList, setOperateDesignationList] = useState(false);
   const [searchInStation, setSearchInStation] = useState("");
   const [dropDownOwnBranch, setDropDownOwnBranch] = useState(true);
   const [selectedDesignation, setSelectedDesignation] = useState([]);
   const [selectedDesignationName, setSelectedDesignationName] = useState([]);
   const [ownBranchCheckBox, setOwnBranchCheckBox] = useState(false);
+  const [otherBranchesDesignation, setOtherBranchesDesignation] = useState({});
+  const [isLoading, setIsLoading] = useState({});
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
+  useEffect(() => {
+    getAllBranches();
+  }, []);
 
   useEffect(() => {
-    filterDesignation();
-  }, [props?.designationList]);
+    setSelectedDesignation([]);
+    setSelectedDesignationName([]);
+    setSearchInStation("");
+    setOwnBranchCheckBox(false);
+  }, [props?.mailId]);
+
+  useEffect(() => {
+    setSearchInStation("");
+  }, [isLoading]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -43,68 +67,51 @@ function ComposeTo(props) {
   }, [props?.to]);
 
   useEffect(() => {
-    props?.commonAddresses.forEach((item) => {
+    commonAddresses.forEach((item) => {
       if (selectedDesignation?.includes(item?.id)) {
         props?.handleFrequentAddresses(item, item?.id);
       }
     });
+
     props?.setTo([...selectedDesignationName]);
+
+    let arr = props?.allCommonAddresses.filter(
+      (item) => !selectedDesignation.includes(item.id)
+    );
+
+    props?.setCommonAddresses(arr);
   }, [selectedDesignation]);
 
-  const filterDesignation = () => {
-    let finalData = [];
-    let finalOtherBranches = {};
-    let otherBranchesData = [];
-    let userBranch = props?.userData?.designations[0]?.branch;
-    props?.designationList?.forEach((item) => {
-      if (item.branch === userBranch) {
-        setOwnBranchDesignationList((prev) => [...prev, item]);
-      } else {
-        otherBranchesData.push(item);
-      }
-    });
-    otherBranchesData.forEach((item) => {
-      if (finalOtherBranches.hasOwnProperty(item.branch)) {
-        finalData.push(item);
-        finalOtherBranches[item.branch] = finalData;
-      } else {
-        finalOtherBranches[item.branch] = [item];
-      }
-    });
-
-    finalOtherBranches = Object.keys(finalOtherBranches)
-      .sort()
-      .reduce(
-        (acc, key) => ({
-          ...acc,
-          [key]: finalOtherBranches[key],
-        }),
-        {}
+  const getAllBranches = async () => {
+    const designationId = props?.userData?.designations.filter((item) => {
+      if (item.default_desig) return item;
+    })[0].id;
+    logDataFunction("GET ALL BRANCH", 0, 0);
+    const resp = await ApiHandle(`${GET_ALL_BRANCH}`, "", "GET", logData);
+    if (resp?.status === 1) {
+      setOwnBranchDesignationList(
+        resp?.data?.ownBranch?.filter((item) => item.id !== designationId)
       );
-
-    Object.keys(finalOtherBranches).map((item) => {
-      finalOtherBranches[item][0]["isOpen"] = false;
-    });
-
-    setOtherBranches(finalOtherBranches);
+      let branch = resp?.data;
+      delete branch["ownBranch"];
+      setOtherBranches(branch);
+    }
   };
 
   const filteredList = (stationList, searchInStation) => {
-    return stationList?.filter((station) =>
-      bySearch(station?.branch, station?.designation, searchInStation)
+    return (
+      Array.isArray(stationList) &&
+      stationList?.filter((station) =>
+        bySearch(`${station?.designation}-${station?.branch}`, searchInStation)
+      )
     );
   };
 
-  const bySearch = (stationBranch, stationDesignation, searchInStation) => {
+  const bySearch = (stationBranch, searchInStation) => {
     if (searchInStation) {
-      return (
-        stationBranch
-          ?.toLowerCase()
-          ?.includes(searchInStation?.toLowerCase()) ||
-        stationDesignation
-          ?.toLowerCase()
-          ?.includes(searchInStation?.toLowerCase())
-      );
+      return stationBranch
+        ?.toLowerCase()
+        ?.includes(searchInStation?.toLowerCase());
     } else return stationBranch;
   };
 
@@ -112,6 +119,7 @@ function ComposeTo(props) {
     const { id, checked } = e.target;
 
     let ID = id.split("-");
+
     if (checked) {
       setSelectedDesignation((prev) => [...prev, +ID[1]]);
       setSelectedDesignationName((prev) => [...prev, item]);
@@ -123,7 +131,6 @@ function ComposeTo(props) {
         selectedDesignationName?.filter((item) => item.id !== +ID[1])
       );
     }
-    setSearchInStation("");
   };
 
   const handleOwnBranch = (e) => {
@@ -145,14 +152,24 @@ function ComposeTo(props) {
   };
 
   const listingDesignation = (desig, i) => {
+    if (props.blankTo === true) {
+      setSelectedDesignationName([]);
+      setSelectedDesignation([]);
+    }
     return (
       <div key={`selectedDesignation${i}`} className="selected-name">
-        <span>{`${desig?.designation}(${desig?.branch})`}</span>
+        <span>
+          {`${desig?.designation}(${desig?.branch})`}
+          {/* {desig?.first_name !== null && desig?.first_name !== undefined ? (
+            <i> ({desig?.first_name})</i>
+          ) : null} */}
+        </span>
         <em
           className="icon ni ni-cross"
           style={{
             opacity: "0.54",
             marginLeft: 3,
+            fontSize: 12,
           }}
           onClick={() => {
             setSelectedDesignationName(
@@ -161,40 +178,228 @@ function ComposeTo(props) {
             setSelectedDesignation(
               selectedDesignation.filter((item) => item !== +desig.id)
             );
+            handleSelectedCommonAddress(desig);
           }}
         ></em>
       </div>
     );
   };
 
-  const handleArrow = (e, item) => {
-    const reference = { ...otherBranches };
-    reference[item][0].isOpen = !reference[item][0].isOpen;
-    setOtherBranches(reference);
+  const handleBranchDesignationArrow = (item, data) => {
+    setOtherBranchesDesignation((prev) => ({
+      ...prev,
+      [item]: {
+        isOpen: !prev[item]?.isOpen,
+        data,
+      },
+    }));
   };
+
+  const handleLoading = (item, isTrue) => {
+    setIsLoading((prev) => ({
+      ...prev,
+      [item]: isTrue,
+    }));
+  };
+
+  const handleArrow = async (e, item) => {
+    handleLoading(item, true);
+    if (
+      !otherBranchesDesignation[item]?.isOpen &&
+      !otherBranchesDesignation[item]?.data?.length > 0
+    ) {
+      handleBranchDesignationArrow(item, otherBranches[item]);
+      handleLoading(item, false);
+    } else {
+      handleBranchDesignationArrow(item, otherBranches[item]);
+
+      handleLoading(item, false);
+    }
+  };
+
+  const filteredListing = (data, branch) => {
+    const filteredArray =
+      Array.isArray(filteredList(data, searchInStation)) &&
+      filteredList(data, searchInStation)?.map((item, id) => {
+        return (
+          <li
+            key={
+              branch === "own" ? `ownBranchList${id}` : `otherBranchList${id}`
+            }
+          >
+            <div className="custom-control custom-control-sm custom-checkbox">
+              <input
+                type="checkbox"
+                className="custom-control-input station_checkbox_1"
+                name="ownBranchList"
+                id={`branch-${item?.id}`}
+                onChange={(e) => {
+                  handleCheckedDesignation(e, item);
+                }}
+                checked={selectedDesignation?.includes(item?.id) ? true : false}
+              />
+              <label
+                className="custom-control-label"
+                htmlFor={`branch-${item?.id}`}
+              >
+                {`${item?.designation}-${item?.branch}  `}
+                {/* {item?.first_name !== null && item?.first_name !== undefined ? (
+                  <i> ({item.first_name})</i>
+                ) : null} */}
+              </label>
+            </div>
+          </li>
+        );
+      });
+    return filteredArray;
+  };
+
+  const branchList = (item) => {
+    return (
+      <div
+        className="other-branch-name"
+        onClick={(e) => {
+          handleArrow(e, item);
+        }}
+      >
+        <div
+          style={{
+            fontSize: 17,
+            fontWeight: "500",
+            opacity: "0.7",
+          }}
+        >
+          {item}
+        </div>
+        {isLoading[item] ? (
+          <Loader type="ThreeDots" color="#6576ff" height={20} width={20} />
+        ) : otherBranchesDesignation[item]?.isOpen ? (
+          <em className="icon ni ni-chevron-down"></em>
+        ) : (
+          <em className="icon ni ni-chevron-right"></em>
+        )}
+      </div>
+    );
+  };
+
+  const handleSelectedCommonAddress = (common) => {
+    if (common?.hasOwnProperty("belongsTo")) {
+      props?.setCommonAddresses((prev) => [...prev, common]);
+    }
+  };
+
+  const frequentCommonAddresses = (commonAddresses) => {
+    return (
+      <div className="nk-reply-form-tools" style={{ borderTop: "none" }}>
+        <ul className="nk-reply-form-actions g-1" style={{ flexWrap: "wrap" }}>
+          {commonAddresses?.map((com, i) => {
+            return (
+              <li
+                key={`commonAddresses${i}`}
+                className="mr-2"
+                onClick={() => {
+                  props?.handleFrequentAddresses(com, com?.id);
+                }}
+              >
+                <div className="frequent_addresses_button">
+                  {`${com?.designation}-${com?.branch}`}
+                  {/* {com?.first_name !== null && com?.first_name !== undefined ? (
+                    <i> ({com?.first_name})</i>
+                  ) : null} */}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  };
+
+  const handleFocus = (event) => {
+    if (event.keyCode === 9 && event.target.nodeName === "INPUT") {
+      window?.document?.getElementById("subject")?.focus();
+      setOperateDesignationList(false);
+    }
+  };
+
+  const handleSearchInStation = (value) => {
+    if (value === "") {
+      Object.keys(otherBranches).map((item) => {
+        let data = otherBranches[item];
+
+        setOtherBranchesDesignation((prev) => ({
+          ...prev,
+          [item]: {
+            isOpen: false,
+            data,
+          },
+        }));
+      });
+    } else {
+      Object.keys(otherBranches).map((item) => {
+        let data = otherBranches[item];
+        setOtherBranchesDesignation((prev) => ({
+          ...prev,
+          [item]: {
+            isOpen: true,
+            data,
+          },
+        }));
+      });
+    }
+  };
+
+  const showingOtherBranches = (branches) =>
+    Object.keys(branches).map((item, id) => {
+      let checker = [];
+      let tempItemArray = [];
+      return (
+        <>
+          <div className="other-branch">
+            <div key={`otherBranchesNone${id}`} style={{ display: "none" }}>
+              {
+                (checker = filteredListing(
+                  otherBranchesDesignation[item]?.data,
+                  "other"
+                ))
+              }
+
+              {checker?.length == 0 ? tempItemArray.push(item) : ""}
+            </div>
+            <li key={`otherBranches${id}`} style={{ padding: "0rem 1.1rem" }}>
+              {!tempItemArray.includes(item) ? branchList(item) : ""}
+              {otherBranchesDesignation[item]?.isOpen && (
+                <div>
+                  {filteredListing(
+                    otherBranchesDesignation[item]?.data,
+                    "other"
+                  )}
+                </div>
+              )}
+            </li>
+          </div>
+        </>
+      );
+    });
 
   return (
     <div className="composeBox">
       <div className="designation-list" ref={closeWinRef}>
         <div className="designation-list-dropdown">
-          <div
-            className="input-group"
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            {!operateDesignationList &&
-            selectedDesignationName?.length > isFullSize
-              ? selectedDesignationName
-                  ?.slice(0, isFullSize)
-                  .map((desig, i) => {
+          <div className="compose-to">
+            <div className="listing-selected-name">
+              {!operateDesignationList &&
+              selectedDesignationName?.length > isFullSize
+                ? selectedDesignationName
+                    ?.slice(0, isFullSize)
+                    .map((desig, i) => {
+                      return listingDesignation(desig, i);
+                    })
+                : selectedDesignationName?.length > 0 &&
+                  selectedDesignationName?.map((desig, i) => {
                     return listingDesignation(desig, i);
-                  })
-              : selectedDesignationName?.length > 0 &&
-                selectedDesignationName?.map((desig, i) => {
-                  return listingDesignation(desig, i);
-                })}
+                  })}
+            </div>
             {!operateDesignationList &&
               selectedDesignationName?.length > isFullSize && (
                 <h3
@@ -206,29 +411,38 @@ function ComposeTo(props) {
                   {selectedDesignationName?.length - isFullSize} more
                 </h3>
               )}
-            <textarea
+
+            <input
               type="text"
-              className="form-control border-right-0 rounded-0 search-input text-area-input"
-              placeholder={!selectedDesignationName?.length > 0 && `To`}
-              style={{
-                marginTop: selectedDesignationName?.length > 0 && "1%",
-                marginBottom: selectedDesignationName?.length > 0 && "1%",
-              }}
+              className="compose-to-textarea"
+              placeholder={`To`}
               name="search"
               onFocus={() => {
                 setOperateDesignationList(true);
               }}
+              value={searchInStation}
               autoComplete="off"
               onChange={(e) => {
                 setSearchInStation(e.target.value);
+                handleSearchInStation(e.target.value);
               }}
+              onKeyDown={handleFocus}
             />
           </div>
           {operateDesignationList && (
             <div>
               <div className="designation-list-dropdown-list">
                 <ul className="link-tidy">
-                  <div className="own-branch">
+                  <div
+                    className="own-branch"
+                    style={{
+                      display:
+                        filteredListing(ownBranchDesignationList, "own")
+                          ?.length === 0
+                          ? "none"
+                          : "",
+                    }}
+                  >
                     <div className="custom-control custom-control-sm custom-checkbox other-branch-name ">
                       <input
                         type="checkbox"
@@ -263,109 +477,11 @@ function ComposeTo(props) {
                         )}
                       </div>
                     </div>
-                    {filteredList(
-                      ownBranchDesignationList,
-                      searchInStation
-                    )?.map((item, id) => {
-                      return (
-                        dropDownOwnBranch && (
-                          <li key={`ownBranchList${id}`}>
-                            <div className="custom-control custom-control-sm custom-checkbox">
-                              <input
-                                type="checkbox"
-                                className="custom-control-input station_checkbox_1"
-                                name="ownBranchList"
-                                id={`branch-${item?.id}`}
-                                onChange={(e) => {
-                                  handleCheckedDesignation(e, item);
-                                }}
-                                checked={
-                                  selectedDesignation?.includes(item?.id)
-                                    ? true
-                                    : false
-                                }
-                              />
-                              <label
-                                className="custom-control-label"
-                                htmlFor={`branch-${item?.id}`}
-                              >
-                                {`${item?.designation}(${item?.branch})`}
-                              </label>
-                            </div>
-                          </li>
-                        )
-                      );
-                    })}
+                    {dropDownOwnBranch &&
+                      filteredListing(ownBranchDesignationList, "own")}
                   </div>
-                  <div className="other-branch">
-                    {Object.keys(otherBranches).map((item, id) => {
-                      return (
-                        <li
-                          key={`otherBranches${id}`}
-                          style={{ padding: "0.1rem 1.1rem" }}
-                        >
-                          <div
-                            className="other-branch-name"
-                            onClick={(e) => {
-                              handleArrow(e, item);
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 17,
-                                fontWeight: "500",
-                                opacity: "0.7",
-                              }}
-                            >
-                              {item}
-                            </div>
-                            {otherBranches[item][0].isOpen ? (
-                              <em className="icon ni ni-chevron-down"></em>
-                            ) : (
-                              <em className="icon ni ni-chevron-right"></em>
-                            )}
-                          </div>
-                          {otherBranches[item][0].isOpen && (
-                            <div>
-                              {filteredList(
-                                otherBranches[item],
-                                searchInStation
-                              )?.map((desig, id) => {
-                                return (
-                                  <div key={`designList${id}`}>
-                                    <div className="custom-control custom-control-sm custom-checkbox">
-                                      <input
-                                        type="checkbox"
-                                        className="custom-control-input station_checkbox_1"
-                                        name="otherBranches"
-                                        id={`branch-${desig?.id}`}
-                                        onChange={(e) => {
-                                          handleCheckedDesignation(e, desig);
-                                        }}
-                                        checked={
-                                          selectedDesignation.includes(
-                                            desig?.id
-                                          )
-                                            ? true
-                                            : false
-                                        }
-                                      />
-                                      <label
-                                        className="custom-control-label"
-                                        htmlFor={`branch-${desig?.id}`}
-                                      >
-                                        {`${desig?.designation}(${desig?.branch})`}
-                                      </label>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </div>
+
+                  {showingOtherBranches(otherBranches)}
                 </ul>
               </div>
             </div>
@@ -373,26 +489,7 @@ function ComposeTo(props) {
         </div>
       </div>
       <div className="frequentAddresses">
-        {props?.commonAddresses.length > 0 && (
-          <div className="nk-reply-form-tools" style={{ borderTop: "none" }}>
-            <ul
-              className="nk-reply-form-actions g-1"
-              style={{ flexWrap: "wrap" }}
-            >
-              {props?.commonAddresses?.map((com, i) => {
-                return (
-                  <li
-                    key={`commonAddresses${i}`}
-                    className="mr-2"
-                    onClick={() => props?.handleFrequentAddresses(com, com?.id)}
-                  >
-                    <div className="frequent_addresses_button">{`${com?.designation}-${com?.branch}`}</div>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
+        {commonAddresses.length > 0 && frequentCommonAddresses(commonAddresses)}
       </div>
     </div>
   );

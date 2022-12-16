@@ -16310,30 +16310,30 @@
         };
     Y(u.tinymce)
 }();
-(function(cloudSettings) {
-    tinymce.overrideDefaults(cloudSettings);
-})({
-    "rtc_tenant_id": "no-api-key",
-    "imagetools_proxy": "https://imageproxy.tiny.cloud/2/image",
-    "suffix": ".min",
-    "linkchecker_service_url": "https://hyperlinking.tiny.cloud",
-    "spellchecker_rpc_url": "https://spelling.tiny.cloud",
-    "spellchecker_api_key": "no-api-key",
-    "tinydrive_service_url": "https://catalog.tiny.cloud",
-    "api_key": "no-api-key",
-    "imagetools_api_key": "no-api-key",
-    "tinydrive_api_key": "no-api-key",
-    "forced_plugins": ["chiffer"],
-    "referrer_policy": "origin",
-    "content_css_cors": true,
-    "custom_plugin_urls": {},
-    "chiffer_snowplow_service_url": "https://sp.tinymce.com/i",
-    "mediaembed_api_key": "no-api-key",
-    "rtc_service_url": "https://rtc.tiny.cloud",
-    "linkchecker_api_key": "no-api-key",
-    "mediaembed_service_url": "https://hyperlinking.tiny.cloud",
-    "service_message": "This domain is not registered with Tiny Cloud.  Please see the \u003ca target=\"_blank\" href=\"https://www.tiny.cloud/docs/quick-start/\"\u003equick start guide\u003c/a\u003e or \u003ca target=\"_blank\" href=\"https://www.tiny.cloud/auth/signup/\"\u003ecreate an account\u003c/a\u003e."
-});
+// (function(cloudSettings) {
+//     tinymce.overrideDefaults(cloudSettings);
+// })({
+//     "rtc_tenant_id": "no-api-key",
+//     "imagetools_proxy": "https://imageproxy.tiny.cloud/2/image",
+//     "suffix": ".min",
+//     "linkchecker_service_url": "https://hyperlinking.tiny.cloud",
+//     "spellchecker_rpc_url": "https://spelling.tiny.cloud",
+//     "spellchecker_api_key": "no-api-key",
+//     "tinydrive_service_url": "https://catalog.tiny.cloud",
+//     "api_key": "no-api-key",
+//     "imagetools_api_key": "no-api-key",
+//     "tinydrive_api_key": "no-api-key",
+//     "forced_plugins": ["chiffer"],
+//     "referrer_policy": "origin",
+//     "content_css_cors": true,
+//     "custom_plugin_urls": {},
+//     "chiffer_snowplow_service_url": "https://sp.tinymce.com/i",
+//     "mediaembed_api_key": "no-api-key",
+//     "rtc_service_url": "https://rtc.tiny.cloud",
+//     "linkchecker_api_key": "no-api-key",
+//     "mediaembed_service_url": "https://hyperlinking.tiny.cloud",
+//     "service_message": "This domain is not registered with Tiny Cloud.  Please see the \u003ca target=\"_blank\" href=\"https://www.tiny.cloud/docs/quick-start/\"\u003equick start guide\u003c/a\u003e or \u003ca target=\"_blank\" href=\"https://www.tiny.cloud/auth/signup/\"\u003ecreate an account\u003c/a\u003e."
+// });
 tinymce.baseURL = "https://cdn.tiny.cloud/1/no-api-key/tinymce/5.8.1-113"
     /* Ephox chiffer plugin
      *

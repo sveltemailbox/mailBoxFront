@@ -1,7 +1,25 @@
 import { useEffect, useState, useRef } from "react";
 import { connect } from "react-redux";
-import { GET_LIST_STATIONS, UPDATE_MAIL } from "../../config/constants";
-import { updateData, updateSeachText } from "../../redux/action/InboxAction";
+import Axios from "axios";
+
+import {
+  GET_LIST_STATIONS,
+  GET_UNREAD_COUNT,
+  UPDATE_MAIL,
+} from "../../config/constants";
+import {
+  updateData,
+  updateSeachText,
+  updateUnreadCall,
+  updateUnreadMailsCount,
+  updateArchiveCall,
+  updateSentCall,
+  updateCrashedCall,
+  updateStarredCall,
+  updateAllCall,
+  updateFolderCachedData,
+  updateArchiveLoader,
+} from "../../redux/action/InboxAction";
 import * as Api from "../../util/api/ApicallModule";
 import Toaster from "../../util/toaster/Toaster";
 import "../../Assets/CSS/pretty-checkbox.min.css";
@@ -9,7 +27,8 @@ import Agree from "../../Assets/images/Tick.png";
 import { Button } from "react-bootstrap";
 import ForwardTo from "./ForwardTo";
 import FolderAdd from "./FolderAdd";
-import { MAIL_ACTIONS, UNREAD_CONSTANTS_VALUES } from "../../util";
+import { MAIL_ACTIONS } from "../../util";
+import Loader from "react-loader-spinner";
 
 const InboxNavbar = (props) => {
   // const [sortTimeState, setSortTimeState] = useState(false);
@@ -30,6 +49,14 @@ const InboxNavbar = (props) => {
   const [searchInStation, setSearchInStation] = useState("");
   const [operateForwardTo, setOperateForwardTo] = useState(false);
   const [addToFolder, setAddToFolder] = useState(false);
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
 
   useEffect(() => {
     if (props.searchText.hasOwnProperty("station")) {
@@ -44,19 +71,22 @@ const InboxNavbar = (props) => {
   }, [props.searchText, stationList]);
 
   useEffect(() => {
+    const ourRequest = Axios.CancelToken.source();
+    getListOfStations(ourRequest.token);
     if (props?.userData?.designations) {
-      getListOfStations();
-    }
-  }, [props?.userData]);
-
-  useEffect(() => {
-    if (props?.userData?.designations) {
-      getListOfStations();
-      getSectionName();
       setOperateMarkReadUnread(false);
+      setSearchInStation("");
       setOperateStationList(false);
     }
-  }, [props?.filterOptions]);
+
+    return () => {
+      ourRequest.cancel(); // <-- 3rd step
+    };
+  }, [
+    props?.filterOptions?.mail_action,
+    props?.filterOptions?.folder,
+    props?.filterOptions?.is_sent,
+  ]);
 
   useEffect(() => {
     setTag([]);
@@ -79,22 +109,21 @@ const InboxNavbar = (props) => {
 
   useEffect(() => {
     if (apiCalledCount.value > 0) {
-      handleRefreshClick();
+      handleRefreshClick("back");
       setApiCalledCount(() => ({ value: 0 }));
     }
   }, [apiCalledCount]);
 
-  const getSectionName = () => {
-    let name = "";
-    Object.keys(props?.filterOptions).map((filter) => {
-      if (filter === "is_read") name = "unread";
-      else if (filter === "is_sent") name = "sent";
-      else if (filter === "is_starred") name = "starred";
-      else if (filter === "is_crashed") name = "crash";
-    });
-    if (name.length === 0) name = "archive";
+  useEffect(() => {
+    getSectionName();
+  }, [props?.filterOptions]);
 
-    setSectionName(name);
+  const getSectionName = () => {
+    if (typeof props?.isActiveModule === "number") {
+      setSectionName("folder");
+    } else {
+      setSectionName(props?.isActiveModule);
+    }
   };
 
   useEffect(() => {
@@ -102,6 +131,7 @@ const InboxNavbar = (props) => {
       if (closeWinRef.current && !closeWinRef.current.contains(event.target)) {
         setOperateMarkReadUnread(false);
         setOperateStationList(false);
+        setSearchInStation("");
       }
     }
 
@@ -111,36 +141,70 @@ const InboxNavbar = (props) => {
     };
   }, [closeWinRef]);
 
-  const handleRefreshClick = async () => {
-    props?.getAllMails();
+  const handleRefreshClick = async (type) => {
+    props?.getAllMails(type);
+    getUnreadCount();
   };
 
-  const getListOfStations = async () => {
+  const updatingKeyForCall = () => {
+    switch (props.isActiveModule) {
+      case "Unread":
+        props.updateUnreadCall(0);
+        break;
+      case "All":
+        props.updateAllCall(0);
+        break;
+      case "Archive":
+        props.updateArchiveCall(0);
+        break;
+      case "Sent":
+        props.updateSentCall(0);
+        break;
+      case "Crashed":
+        props.updateCrashedCall(0);
+        break;
+      case "Starred":
+        props.updateStarredCall(0);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const getListOfStations = async (cancelToken) => {
     let filter = "";
     if (props?.filterOptions.hasOwnProperty("mail_action")) {
       filter = `mail_action=${props?.filterOptions.mail_action}`;
+    } else if (props?.filterOptions.hasOwnProperty("is_sent")) {
+      filter = "is_sent=1";
     } else if (props?.filterOptions.hasOwnProperty("folder")) {
       filter = `folder=${props?.filterOptions?.folder}`;
     }
-
+    logDataFunction("STATION LIST", 0, 0);
     const resp = await Api.ApiHandle(
       `${GET_LIST_STATIONS}${filter}`,
       "",
-      "GET"
+      "GET",
+      logData,
+      cancelToken
     );
 
     if (resp?.status === 1) {
       const station = [];
+      let obj;
       resp?.data?.map((stat) => {
-        const obj = {
+        obj = {
           id: stat?.id,
-          station: stat?.station,
+          station: stat?.designation
+            ? `${stat?.designation}(${stat?.branch})`
+            : `${stat?.branch}`,
         };
+
         station.push(obj);
       });
       setStationList(station);
     } else {
-      Toaster("error", "Couldn't get list of stations");
+      if (resp) Toaster("error", "Couldn't get list of stations");
     }
   };
 
@@ -292,6 +356,7 @@ const InboxNavbar = (props) => {
       setSearch({ search: "" });
       setTag([]);
       props.setFilterOptions({ ...props.filterOptions });
+      updatingKeyForCall();
     } else if (id === "SelectAll") {
       stationList.map((stat) => {
         props?.setSelectedstation((prev) => [...prev, stat?.id]);
@@ -341,6 +406,7 @@ const InboxNavbar = (props) => {
   const deleteStationTag = (station) => {
     let arr = [];
     props?.setStationTag(props?.stationTag.filter((item) => item !== station));
+
     stationList.map((stat) => {
       if (stat.station === station) {
         arr.push(props?.selectedStation.filter((item) => item !== stat.id));
@@ -349,8 +415,10 @@ const InboxNavbar = (props) => {
         );
       }
     });
-    if (arr[0].length < 1) {
+
+    if (arr?.[0]?.length < 1) {
       delete props?.filterOptions?.by_stations;
+
       props.setFilterOptions({ ...props.filterOptions });
     } else {
       if (props?.selectedStation.length > 0) {
@@ -378,6 +446,7 @@ const InboxNavbar = (props) => {
   };
 
   const clearAllStationTag = () => {
+    updatingKeyForCall();
     props?.setSelectedstation([]);
     props?.setStationTag([]);
     delete props?.filterOptions?.by_stations;
@@ -398,15 +467,155 @@ const InboxNavbar = (props) => {
     }
   };
 
-  const callApiForUpdata = async (data) => {
-    const resp = await Api.ApiHandle(UPDATE_MAIL, data, "PUT");
-    if (resp.status === 1) {
-      setApiCalledCount((prev) => ({ value: prev.value + 1 }));
-      setOperateMarkReadUnread(false);
+  const getUnreadCount = async () => {
+    logDataFunction("COUNT UNREAD MAIL", 0, 0);
+    const resp = await Api.ApiHandle(`${GET_UNREAD_COUNT}`, "", "GET", logData);
+    if (resp && resp.status === 1) {
+      props?.updateUnreadMailsCount(resp.data);
     }
   };
 
+  const callApiForUpdata = async (data, removeFromUnread) => {
+    props?.setLoader(true);
+    if (removeFromUnread !== undefined) {
+      props?.updateArchiveLoader(removeFromUnread);
+    }
+    logDataFunction("UPDATE MAILS", 0, 0);
+    const resp = await Api.ApiHandle(UPDATE_MAIL, data, "PUT", logData);
+
+    if (resp.status === 1) {
+      props?.setLoader(false);
+      props?.updateArchiveLoader(false);
+      setApiCalledCount((prev) => ({ value: prev.value + 1 }));
+      props.setSelectedMailData([]);
+      setOperateMarkReadUnread(false);
+      getUnreadCount();
+      props.setSelectedMail([]);
+    }
+  };
+
+  const updateReadUnreadCache = (isRead, removeFromUnread) => {
+    if (removeFromUnread) {
+      props?.updateUnreadCall(0);
+      props.updateArchiveCall(0);
+      props.updateAllCall(0);
+      props.updateStarredCall(0);
+      props.updateCrashedCall(0);
+    } else if (props?.isActiveModule === "Archive" && !isRead) {
+      props.updateUnreadCall(0);
+      props.updateArchiveCall(0);
+      props.updateAllCall(0);
+      props.updateCrashedCall(0);
+      props.updateStarredCall(0);
+    } else {
+      const designationId = props?.userData?.designations.filter((item) => {
+        if (item.default_desig) return item;
+      })[0].id;
+      let idsToUpdate = [];
+      props?.selectedMailData?.forEach((item) => {
+        idsToUpdate.push(item?.id);
+      });
+      props?.mailData.filter((item) => {
+        if (idsToUpdate.includes(item?.id)) {
+          if (designationId == item?.actualFormId) {
+            item.fromAction = updateActions(item?.fromAction, isRead);
+          } else {
+            item.mailAction = updateActions(item?.mailAction, isRead);
+          }
+        }
+      });
+      if (!isRead) {
+        props.updateArchiveCall(0);
+      }
+
+      switch (props.isActiveModule) {
+        case "Unread":
+          props.updateAllCall(0);
+          props.updateStarredCall(0);
+          props.updateCrashedCall(0);
+          break;
+        case "All":
+          props?.updateUnreadCall(0);
+          props.updateStarredCall(0);
+          props.updateCrashedCall(0);
+          break;
+        case "Crashed":
+          props?.updateUnreadCall(0);
+          props.updateAllCall(0);
+          props.updateStarredCall(0);
+          break;
+        case "Starred":
+          props?.updateUnreadCall(0);
+          props.updateAllCall(0);
+          props.updateCrashedCall(0);
+          break;
+
+        default:
+          props.updateUnreadCall(0);
+          props.updateAllCall(0);
+          props.updateArchiveCall(0);
+          props.updateCrashedCall(0);
+          props.updateStarredCall(0);
+          break;
+      }
+    }
+  };
+
+  const updateActions = (action, isRead) => {
+    let params = "";
+    switch (action) {
+      case "99":
+        isRead ? (params = "98") : (params = "99");
+        break;
+      case "98":
+        isRead ? (params = "98") : (params = "99");
+        break;
+      case "97":
+        isRead ? (params = "96") : (params = "97");
+        break;
+      case "96":
+        isRead ? (params = "96") : (params = "97");
+        break;
+      case "89":
+        isRead ? (params = "88") : (params = "89");
+        break;
+      case "88":
+        isRead ? (params = "88") : (params = "89");
+        break;
+      case "87":
+        isRead ? (params = "87") : (params = "86");
+        break;
+      case "86":
+        isRead ? (params = "87") : (params = "86");
+        break;
+      case "79":
+        isRead ? (params = "78") : (params = "79");
+        break;
+      case "78":
+        isRead ? (params = "78") : (params = "79");
+        break;
+      case "69":
+        isRead ? (params = "68") : (params = "69");
+        break;
+      case "68":
+        isRead ? (params = "68") : (params = "69");
+        break;
+
+      default:
+        break;
+    }
+    return params;
+  };
+
+  const handleFolderCached = () => {
+    if (props?.folderCachedData !== undefined) {
+      props?.updateFolderCachedData("delete");
+    }
+  };
   const readUnread = async (isRead, removeFromUnread) => {
+    handleFolderCached();
+    await updateReadUnreadCache(isRead, removeFromUnread);
+
     const arr = [];
 
     props.selectedMailData.forEach(async (item, i) => {
@@ -415,24 +624,25 @@ const InboxNavbar = (props) => {
         _createParams = await createParams(
           isRead,
           removeFromUnread,
-          "from_action",
-          "from_read_mail",
-          item.concat_from_action,
-          item.concat_user_mail_ids
+          "action",
+          "is_read_mail",
+          item.fromAction,
+          item
         );
       } else {
         _createParams = await createParams(
           isRead,
           removeFromUnread,
-          "mail_action",
+          "action",
           "is_read_mail",
-          item.concat_mail_action,
-          item.concat_user_mail_ids
+          item.mailAction,
+          item
         );
       }
-
-      arr.push(..._createParams);
-      if (i === props.selectedMailData.length - 1) callApiForUpdata(arr);
+      arr.push(_createParams);
+      if (i === props.selectedMailData.length - 1) {
+        callApiForUpdata(arr, removeFromUnread);
+      }
     });
   };
 
@@ -442,30 +652,25 @@ const InboxNavbar = (props) => {
     actionKey,
     readKey,
     mailActionValue,
-    concat_user_mail_ids
+    inbox
   ) => {
-    const data = [];
+    let params = {
+      id: inbox.id,
+      userMailId: inbox.userMailId,
+    };
 
-    mailActionValue.forEach((item, index) => {
-      let params = {};
+    if (isRead && !removeFromUnread) {
+      params[actionKey] = checkReadMailAction(mailActionValue);
+      params[readKey] = 1;
+    } else if (!isRead && !removeFromUnread) {
+      params[actionKey] = checkMailAction(mailActionValue);
+      params[readKey] = 0;
+    } else {
+      params[actionKey] = checkReadMailAction(mailActionValue);
+      params[readKey] = 0;
+    }
 
-      if (isRead && !removeFromUnread) {
-        params[actionKey] = checkReadMailAction(item);
-        params[readKey] = 1;
-      } else if (!isRead && !removeFromUnread) {
-        params[actionKey] = checkMailAction(item);
-        params[readKey] = 0;
-      } else {
-        params[actionKey] = checkReadMailAction(item);
-        params[readKey] = 0;
-      }
-
-      params.id = concat_user_mail_ids[index];
-
-      data.push(params);
-    });
-
-    return data;
+    return params;
   };
 
   const checkMailAction = (action) => {
@@ -481,7 +686,7 @@ const InboxNavbar = (props) => {
         mailAction = "89";
         break;
       case "86":
-        mailAction = "87";
+        mailAction = "86";
         break;
       case "78":
         mailAction = "79";
@@ -497,8 +702,9 @@ const InboxNavbar = (props) => {
         break;
       case "89":
         mailAction = "89";
+        break;
       case "87":
-        mailAction = "87";
+        mailAction = "86";
         break;
       case "79":
         mailAction = "79";
@@ -523,8 +729,8 @@ const InboxNavbar = (props) => {
       case "89":
         mailAction = "88";
         break;
-      case "87":
-        mailAction = "86";
+      case "86":
+        mailAction = "87";
         break;
       case "79":
         mailAction = "78";
@@ -541,8 +747,8 @@ const InboxNavbar = (props) => {
       case "88":
         mailAction = "88";
         break;
-      case "86":
-        mailAction = "86";
+      case "87":
+        mailAction = "87";
         break;
       case "78":
         mailAction = "78";
@@ -564,6 +770,7 @@ const InboxNavbar = (props) => {
             setOperateForwardTo={setOperateForwardTo}
             selectedMail={props.selectedMail}
             setSelectedMail={props.setSelectedMail}
+            selectedMailData={props.selectedMailData}
           />
         )}
         {addToFolder && props.selectedMail.length > 0 && (
@@ -574,9 +781,16 @@ const InboxNavbar = (props) => {
               selectedMail={props.selectedMail}
               setSelectedMail={props.setSelectedMail}
               selectedMailData={props.selectedMailData}
+              setSelectedMailData={props.setSelectedMailData}
+              setFilterOptions={props.setFilterOptions}
+              setLoader={props.setLoader}
+              loader={props.loader}
+              setIsFolderLoaderId={props.setIsFolderLoaderId}
+              setIsMailAddedToFolder={props?.setIsMailAddedToFolder}
             />
           </div>
         )}
+
         <div className="nk-ibx-head-actions fullWidth">
           <div className="nk-ibx-head-check"></div>
           <ul className="nk-ibx-head-tools g-1 fullWidth">
@@ -686,12 +900,20 @@ const InboxNavbar = (props) => {
                 </li>
               )}
             <li>
-              <div
-                className="btn btn-icon btn-trigger"
-                onClick={handleRefreshClick}
+              <abbr
+                title={
+                  props?.isActiveModule === "Unread"
+                    ? "Refresh For New Mails"
+                    : "Refresh"
+                }
               >
-                <em className="icon ni ni-undo"></em>
-              </div>
+                <div
+                  className="btn btn-icon btn-trigger"
+                  onClick={() => handleRefreshClick("refresh")}
+                >
+                  <em className="icon ni ni-undo"></em>
+                </div>
+              </abbr>
             </li>
             {/* <li className="mr-n1">
               <div className="my-dropdown">
@@ -756,7 +978,7 @@ const InboxNavbar = (props) => {
               </div>
             </li> */}
 
-            {props.filterOptions.is_sent !== 1 && props.noOfMails > 0 && (
+            {
               <li className="btn btn-trigger btn-icon btn-tooltip">
                 <div className="station-filter">
                   <div
@@ -842,30 +1064,34 @@ const InboxNavbar = (props) => {
                           {filteredList(stationList, searchInStation).map(
                             (stat, i) => {
                               return (
-                                <li key={`stationList${i}`}>
-                                  <div className="custom-control custom-control-sm custom-checkbox">
-                                    <input
-                                      type="checkbox"
-                                      className="custom-control-input station_checkbox_1"
-                                      id={`${stat?.id}`}
-                                      name={stat.station}
-                                      onChange={handleCheckedStation}
-                                      checked={
-                                        props?.selectedStation.includes(
-                                          stat?.id
-                                        )
-                                          ? true
-                                          : false
-                                      }
-                                    />
-                                    <label
-                                      className="custom-control-label"
-                                      htmlFor={`${stat?.id}`}
-                                    >
-                                      {stat?.station}
-                                    </label>
-                                  </div>
-                                </li>
+                                <>
+                                  {stat?.station !== "null" ? (
+                                    <li key={`stationList${i}`}>
+                                      <div className="custom-control custom-control-sm custom-checkbox">
+                                        <input
+                                          type="checkbox"
+                                          className="custom-control-input station_checkbox_1"
+                                          id={`${stat?.id}`}
+                                          name={stat?.station}
+                                          onChange={handleCheckedStation}
+                                          checked={
+                                            props?.selectedStation.includes(
+                                              stat?.id
+                                            )
+                                              ? true
+                                              : false
+                                          }
+                                        />
+                                        <label
+                                          className="custom-control-label"
+                                          htmlFor={`${stat?.id}`}
+                                        >
+                                          {stat?.station}
+                                        </label>
+                                      </div>
+                                    </li>
+                                  ) : null}
+                                </>
                               );
                             }
                           )}
@@ -891,10 +1117,16 @@ const InboxNavbar = (props) => {
                   )}
                 </div>
               </li>
-            )}
+            }
           </ul>
         </div>
-        <div>
+        <div
+          style={{
+            width: "30%",
+            position: "fixed",
+            right: 0,
+          }}
+        >
           <ul className="nk-ibx-head-tools g-1">
             <li>
               <form
@@ -925,39 +1157,64 @@ const InboxNavbar = (props) => {
               </form>
             </li>
 
-            <li className="d-none d-sm-block ml-n5">
-              <div
-                className={`btn btn-icon btn-trigger btn-tooltip ${
-                  props.total > props.mailDataLength ? "" : "disabled-action"
-                }`}
+            {props?.isLoadingForCount ? (
+              <li
+                style={{
+                  position: "relative",
+                }}
               >
-                <em
-                  className="icon ni ni-chevron-left"
-                  onClick={(e) => {
-                    props.getPrevClick(e);
-                  }}
-                ></em>
-              </div>
-            </li>
+                <Loader
+                  type="ThreeDots"
+                  color="#6576ff"
+                  height={30}
+                  width={30}
+                />
+              </li>
+            ) : (
+              <>
+                <li className="d-none d-sm-block ml-n5">
+                  <div
+                    className={`btn btn-icon btn-trigger btn-tooltip ${
+                      props.total > props.mailDataLength &&
+                      !props?.loader &&
+                      props?.disablePreviousNext.previous
+                        ? ""
+                        : "disabled-action"
+                    }`}
+                  >
+                    <em
+                      className="icon ni ni-chevron-left"
+                      onClick={(e) => {
+                        props.getPrevClick(e);
+                      }}
+                    ></em>
+                  </div>
+                </li>
 
-            <li>
-              {props?.total}/{props?.noOfMails}
-            </li>
+                <li>
+                  {props?.total}/{props?.noOfMails}
+                </li>
 
-            <li className="d-none d-sm-block">
-              <div
-                className={`btn btn-icon btn-trigger btn-tooltip ${
-                  props.total < props.noOfMails ? "" : "disabled-action"
-                }`}
-              >
-                <em
-                  className="icon ni ni-chevron-right"
-                  onClick={() => {
-                    props.getNextClick(props.mailDataLength);
-                  }}
-                ></em>
-              </div>
-            </li>
+                <li className="d-none d-sm-block">
+                  <div
+                    className={`btn btn-icon btn-trigger btn-tooltip ${
+                      props.total < props.noOfMails &&
+                      !props?.loader &&
+                      props?.disablePreviousNext.next
+                        ? ""
+                        : "disabled-action"
+                    }`}
+                  >
+                    <em
+                      className="icon ni ni-chevron-right"
+                      onClick={() => {
+                        props.getNextClick();
+                      }}
+                    ></em>
+                  </div>
+                </li>
+              </>
+            )}
           </ul>
         </div>
         <div className="search-wrap" data-search="search">
@@ -993,7 +1250,11 @@ const InboxNavbar = (props) => {
               <div className="search-tag" key={`props?.stationTag${i}`}>
                 <ul className="nk-ibx-tags g-1">
                   <li className="btn-group is-tags">
-                    <a className="btn btn-xs btn btn-dim">{`From: ${stat}`}</a>
+                    <a className="btn btn-xs btn btn-dim">
+                      {props.filterOptions.is_sent !== 1
+                        ? `From: ${stat}`
+                        : `To: ${stat}`}
+                    </a>
                     <a className="btn btn-xs btn-icon btn btn-dim">
                       <em
                         className="icon ni ni-cross"
@@ -1044,11 +1305,24 @@ const InboxNavbar = (props) => {
   );
 };
 
-const mapActionToProps = { updateData, updateSeachText };
+const mapActionToProps = {
+  updateData,
+  updateSeachText,
+  updateUnreadCall,
+  updateUnreadMailsCount,
+  updateArchiveCall,
+  updateAllCall,
+  updateSentCall,
+  updateCrashedCall,
+  updateStarredCall,
+  updateFolderCachedData,
+  updateArchiveLoader,
+};
 const mapStateToProps = (state) => ({
   data: state.data,
   userData: state.userData,
   searchText: state.searchText,
   isActiveModule: state.isActiveModule,
+  folderCachedData: state.folderCachedData,
 });
 export default connect(mapStateToProps, mapActionToProps)(InboxNavbar);

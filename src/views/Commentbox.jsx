@@ -1,13 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import fileDownload from "js-file-download";
 import { formatDateTime } from "../util/dateFormat/DateFormat";
 import { connect } from "react-redux";
 import Axios from "axios";
 import Toaster from "../util/toaster/Toaster";
+import { LogApi } from "../util/apiLog/LogApi";
 
 const Commentbox = (props) => {
   const [openTextBox, setOpenTextBox] = useState(true);
+  const [downLoadAll, setDownLoadAll] = useState(false);
+  let attachment_ids = [];
+  let logData = {};
 
+  useEffect(() => {
+    setDownLoadAll(false);
+    if (props?.generalCommentData.length > 0) {
+      props?.generalCommentData.forEach((attachments) => {
+        attachments.attachmentList.forEach((attachment) => {
+          attachment_ids = [...attachment_ids, attachment.id];
+          if (attachment_ids.length > 0) {
+            setDownLoadAll(true);
+          } else {
+            setDownLoadAll(false);
+          }
+        });
+      });
+    }
+  }, [props?.generalCommentData]);
+
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
   const handleOpenTextBox = () => {
     setOpenTextBox((openTextBox) => !openTextBox);
   };
@@ -29,6 +56,10 @@ const Commentbox = (props) => {
       if (localStorage.getItem("auth")) {
         headers.Authorization = `Bearer ${localStorage.getItem("auth")}`;
       }
+      logDataFunction("DOWNLOAD ATTACHMENT FROM COMMENT BOX", props.mailId, [
+        attachements.id,
+      ]);
+      LogApi(logData);
       Axios.get(apiurl, { responseType: "blob", headers: headers })
         .then(async (res) => {
           fileDownload(res.data, name[name.length - 1]);
@@ -45,6 +76,10 @@ const Commentbox = (props) => {
       if (localStorage.getItem("auth")) {
         headers.Authorization = `Bearer ${localStorage.getItem("auth")}`;
       }
+      logDataFunction("DOWNLOAD ATTACHMENT FROM COMMENT BOX", props.mailId, [
+        attachements.id,
+      ]);
+      LogApi(logData);
 
       Axios.get(apiurl, { responseType: "blob", headers: headers })
         .then(async (res) => {
@@ -56,6 +91,30 @@ const Commentbox = (props) => {
           // setSpinner(false);
         });
     }
+  };
+
+  const handleDownloadAllAttachment = () => {
+    if (props?.generalCommentData.length > 0) {
+      props?.generalCommentData.forEach((attachments) => {
+        attachments.attachmentList.forEach((attachment) => {
+          return (attachment_ids = [...attachment_ids, attachment.id]);
+        });
+      });
+    }
+
+    const win = window.open(
+      `${process.env.REACT_APP_BASE_API_URL}/api/zipFile/downloadzip?attach_id=${attachment_ids}&user_id=${props.userData.id}`,
+      "_blank"
+    );
+    win?.focus();
+
+    logDataFunction(
+      "DOWNLOAD ALL ATTACHMENT FROM COMMENT",
+      props.mailId,
+      attachment_ids
+    );
+    attachment_ids = [];
+    LogApi(logData);
   };
 
   return (
@@ -108,13 +167,24 @@ const Commentbox = (props) => {
                   cursor: "default",
                 }}
               >
-                <div style={{ display: "flex" }}>
+                <div style={{ display: "flex", alignItems: "center" }}>
                   <span
                     className="lead-text"
                     style={{ color: "#707070", fontSize: 18 }}
                   >
                     Notes
                   </span>
+                  {downLoadAll ? (
+                    <abbr
+                      title="Download All"
+                      style={{ marginLeft: "25rem" }}
+                      onClick={handleDownloadAllAttachment}
+                    >
+                      <div className="btn btn-trigger btn-icon btn-tooltip">
+                        <em className="icon ni ni-download"></em>
+                      </div>
+                    </abbr>
+                  ) : null}
                 </div>
 
                 <em
@@ -154,9 +224,7 @@ const Commentbox = (props) => {
                               </td>
                               <td style={{ padding: "0px 20px" }}>
                                 <div className="comment-time">
-                                  {comment?.updatedTime
-                                    ? formatDateTime(comment?.updatedTime)
-                                    : formatDateTime(comment?.createdTime)}
+                                  {formatDateTime(comment?.createdTime)}
                                 </div>
                               </td>
                             </tr>

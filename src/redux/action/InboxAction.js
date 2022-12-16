@@ -69,3 +69,127 @@ export const updateSortFilter = (attribute) => {
     payload: attribute,
   };
 };
+
+export const updateSwitching = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_SWITCHING,
+    payload: attribute,
+  };
+};
+
+export const updateUnreadCache = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_UNREAD_CACHE,
+    payload: attribute,
+  };
+};
+
+export const clearUnreadCache = (attribute) => {
+  return {
+    type: ACTIONS.CLEAR_UNREAD_CACHE,
+    payload: attribute,
+  };
+};
+
+export const updateUnreadCall = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_UNREAD_CALL,
+    payload: attribute,
+  };
+};
+export const updateArchiveCache = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_ARCHIVE_CACHE,
+    payload: attribute,
+  };
+};
+export const updateArchiveCall = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_ARCHIVE_CALL,
+    payload: attribute,
+  };
+};
+export const updateAllCache = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_ALL_CACHE,
+    payload: attribute,
+  };
+};
+export const updateAllCall = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_ALL_CALL,
+    payload: attribute,
+  };
+};
+export const updateSentCache = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_SENT_CACHE,
+    payload: attribute,
+  };
+};
+
+export const updateSentCall = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_SENT_CALL,
+    payload: attribute,
+  };
+};
+export const updateStarredCache = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_STARRED_CACHE,
+    payload: attribute,
+  };
+};
+export const updateStarredCall = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_STARRED_CALL,
+    payload: attribute,
+  };
+};
+export const updateCrashedCache = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_CRASHED_CACHE,
+    payload: attribute,
+  };
+};
+export const updateCrashedCall = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_CRASHED_CALL,
+    payload: attribute,
+  };
+};
+
+export const updateFolderCachedData = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_FOLDER_CACHED_DATA,
+    payload: attribute,
+  };
+};
+
+export const updateAddToFolderCache = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_ADD_TO_FOLDER_CACHE,
+    payload: attribute,
+  };
+};
+export const updateArchiveLoader = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_ARCHIVE_LOADER,
+    payload: attribute,
+  };
+};
+
+export const updateMostFrequent = (attribute) => {
+  return {
+    type: ACTIONS.UPDATE_MOST_FREQUENT,
+    payload: attribute,
+  };
+};
+
+
+export const updateAppliactionType = (attribute) => {
+  return {
+    type: ACTIONS.APPLICATION_TYPE,
+    payload: attribute,
+  };
+};

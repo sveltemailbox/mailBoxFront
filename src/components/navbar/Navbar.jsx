@@ -5,14 +5,18 @@ import Modal from "react-modal";
 
 import ProfileDropdown from "../profileDropdown";
 import Viewsearchbar from "../../3ColumnView/components/Viewsearchbar";
-import { USER_PROFILE } from "../../config/constants";
+import { SWITCH_APPLICATION, USER_PROFILE } from "../../config/constants";
 import { isLogin } from "../../util";
 import * as Api from "../../util/api/ApicallModule";
 import {
   updateUserData,
   updateActiveModule,
 } from "../../redux/action/InboxAction";
-import Icon from "../../Assets/images/My_logo.svg";
+import { MAIL_ACTIONS } from "../../util";
+import dotIcon from "./menu-dots-svgrepo-com.svg"
+import "./Navbar.css"
+import { useSelector } from "react-redux";
+import axios from "axios";
 
 const customStyles = {
   overlay: {
@@ -35,15 +39,24 @@ const customStyles = {
 
 const Navbar = (props) => {
   const [open, setOpen] = useState(false);
+  const [authToken,setAuthToken] = useState()
+
+  const [applicationType,setApplicationType] = useState("")
   const [switchUserData, setSwitchUserData] = useState({
     name: {},
     isLoading: false,
   });
   const profileNode = useRef();
   const history = useHistory();
-
   const location = useLocation();
-
+  let logData = {};
+  const logDataFunction = (type, mail_id, attachId) => {
+    logData = {
+      type: type,
+      mail_id: mail_id,
+      attach_id: attachId,
+    };
+  };
   useEffect(() => {
     const isAuthenticated = isLogin();
     isAuthenticated && getUserData();
@@ -58,9 +71,17 @@ const Navbar = (props) => {
     };
   }, []);
 
+  useEffect(() =>{
+    const _applicationType = localStorage.getItem("application")
+    const token = localStorage.getItem("auth")
+    setAuthToken(token)
+    setApplicationType(_applicationType)
+  },[])
+
   const getUserData = async () => {
-    const resp = await Api.ApiHandle(USER_PROFILE, "", "GET");
-    if (resp.status === 1) {
+    logDataFunction("USER DATA", 0, 0);
+    const resp = await Api.ApiHandle(USER_PROFILE, "", "GET", logData);
+    if (resp && resp.status === 1) {
       props.updateUserData(resp?.data);
     }
   };
@@ -87,6 +108,20 @@ const Navbar = (props) => {
   //     : history.push("/3ColumnView");
   // };
 
+  const handleIms = async() => {
+    let payload= {
+      token:authToken,
+      from_app:"MBX",
+      to_app:"IMS"
+    }
+      const resp = await axios.post("http://14.140.15.95:8802/api/appSwitch",payload);
+      if(resp?.data?.status === 1){
+        window.open(`${process.env.REACT_APP_IMS_SSO_LOGIN}?token=${resp?.data?.data}&app_type=${"MBX"}`, '_blank')
+      }
+
+
+  }
+
   return (
     <>
       <div className="nk-header nk-header-fixed is-light">
@@ -95,29 +130,36 @@ const Navbar = (props) => {
             {/* <NavLink exact to="/mail" style={{ marginRight: "auto" }}> */}
             <div
               className="nk-header-app-name"
-              style={{ cursor: "pointer", marginRight: "auto" }}
-              onClick={() => {
-                history.push("/mail");
-                props?.updateActiveModule("Unread");
+              style={{
+                cursor: "pointer",
+                marginRight: "auto",
+                marginLeft: "-9px",
               }}
-              // onClick={handleredirect}
+              onClick={async () => {
+                history.push("/mail");
+              }}
             >
-              <div
-                className="nk-header-app-logo"
-                style={{ marginLeft: "-35%" }}
-              >
-                {/* <em className="icon ni ni-inbox bg-purple-dim"></em> */}
-                <img
+              <div className="nk-header-app-logo">
+                <em
+                  className="icon ni ni-inbox bg-purple-dim"
+                  style={{ fontSize: 36 }}
+                ></em>
+                {/* <img
                   className="image"
                   style={{ maxWidth: "420%", width: "450%" }}
                   src={Icon}
                   alt="Mailbox"
-                />
+                /> */}
               </div>
-              {/* <div className="nk-header-app-info">
-                <span className="lead-text">Mail Box</span>
-              </div> */}
+              <div className="nk-header-app-info">
+                <span className="lead-text" style={{ fontSize: 20 }}>
+                  Mail Box
+                </span>
+              </div>
             </div>
+                                                              <div className="dot-icon-dropdown" onClick={() => handleIms()}>
+                <span className="ims-icon">{applicationType && applicationType}</span>
+              </div>
             {/* </NavLink> */}
             {location.pathname === "/3ColumnView" && (
               <div>
@@ -126,7 +168,10 @@ const Navbar = (props) => {
                 {/* <Search onChange={handleChange} onSubmit={searchMail} /> */}
               </div>
             )}
-
+                {/* <div style={{padding:"5px",marginRight:"5px"}}>
+                    <img src={dotIcon} /> */}
+                {/* </div> */}
+      
             <div className="nk-header-tools" ref={profileNode}>
               <ul className="nk-quick-nav">
                 {props.userData.role === 0 ? "" : ""}
@@ -149,6 +194,11 @@ const Navbar = (props) => {
                       getUserData={getUserData}
                       setSwitchUserData={setSwitchUserData}
                       setSwitchUser={props.setSwitchUser}
+                      autoRefreshInterval={props.autoRefreshIntervalUnread}
+                      autoRefreshIntervalAll={props.autoRefreshIntervalAll}
+                      autoRefreshIntervalCrashed={
+                        props.autoRefreshIntervalCrashed
+                      }
                     />
                   )}
                 </li>
@@ -173,7 +223,10 @@ const Navbar = (props) => {
   );
 };
 
-const mapActionToProps = { updateUserData, updateActiveModule };
+const mapActionToProps = {
+  updateUserData,
+  updateActiveModule,
+};
 
 const mapStateToProps = (state) => ({
   userData: state.userData,

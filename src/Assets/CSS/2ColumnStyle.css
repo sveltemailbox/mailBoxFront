@@ -12,7 +12,10 @@
 .tooltip1 {
   position: relative;
 }
-
+.myoverflow {
+  overflow-y: scroll !important;
+  height: 280px !important;
+}
 .tooltip1 span {
   background: none repeat scroll 0 0 #ff8787; /*-- some basic styling */
   color: #fff;
@@ -452,6 +455,26 @@ select:-webkit-autofill:focus {
   background-color: #3f54ff;
   border: 2px solid #3249ff;
 }
+.downloadButton {
+  height: 32px;
+  width: -webkit-fill-available;
+  font-size: 15px !important;
+  background-color: white;
+  display: flex;
+  align-items: center;
+  color: #6576ff;
+  cursor: pointer;
+  justify-content: center;
+  border: 1px solid #e5e9f2;
+  border-radius: 4px;
+}
+.downloadButton:hover {
+  color: white;
+  background-color: #3f54ff;
+
+  /* border: 2px solid #3249ff; */
+}
+
 .myButton:active {
   position: relative;
   top: 1px;
@@ -783,6 +806,21 @@ span.tox-statusbar__branding,
   cursor: pointer;
 }
 
+.help-section {
+   display: flex;
+   margin: 5px;
+   align-items: right;
+   text-align: right;
+   cursor: pointer;
+}
+
+.help-section-icon {
+   font-size: 25px;
+   color: #526484;
+   margin-right: 8px;
+   cursor: pointer;
+}
+
 .sign-out-button {
   background-color: #6576ff;
   border-radius: 70px;
@@ -827,7 +865,11 @@ span.tox-statusbar__branding,
   top: -150px !important;
 }
 
-.fhaVWy {
+/* .fhaVWy {
+  max-height: 400px;
+  overflow-y: auto !important;
+} */
+.trackScroller {
   max-height: 400px;
   overflow-y: auto !important;
 }
@@ -849,10 +891,10 @@ span.tox-statusbar__branding,
   border-bottom: 1px solid #e5e9f2 !important;
 }
 
-.margin-heading-highlighted {
-  /* display: flex !important;
+/* .margin-heading-highlighted { */
+/* display: flex !important;
   justify-content: space-between; */
-}
+/* } */
 
 .highlight-by-heading {
   padding: 2px 30px;
@@ -1014,14 +1056,76 @@ abbr[title] {
   padding-right: 10px;
   font-weight: 500;
   font-family: "Segoe UI, Regular";
+  white-space: pre-wrap;
+  word-wrap: break-word;
   font-size: 14px;
   color: rgb(82, 100, 132);
 }
 
 .other-icons {
   display: flex;
+  color: #526484;
   align-items: center;
-  justify-content: space-evenly;
+  /* justify-content: space-evenly; */
   margin-left: 1.7%;
   width: 18.5%;
+}
+
+.compose-message-div {
+  overflow: auto;
+  max-height: 90%;
+  height: 30rem;
+}
+
+.compose-message-div::-webkit-scrollbar {
+  width: 0 !important;
+}
+
+.folder-styling {
+  padding-top: 2px;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+}
+
+.folder-tags {
+  cursor: pointer;
+  border-radius: 10px;
+  margin-top: 3%;
+}
+
+.remove-folder-options {
+  cursor: pointer;
+  align-items: center;
+  display: flex;
+  justify-content: space-evenly;
+  margin-top: 2%;
+  width: 50%;
+}
+
+.remove-folder-yes {
+  background-color: #efefef;
+  text-align: center;
+  width: 50px;
+}
+
+.mail-per-page-preference input {
+  width: 23.2rem;
+  height: 2.2rem;
+  border: none;
+  border-radius: 3px;
+  outline: none;
+  padding: 0 0.5rem 0 0.5rem;
+}
+
+/* Chrome, Safari, Edge, Opera */
+.mail-per-page-preference input::-webkit-outer-spin-button,
+.mail-per-page-preference input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+.mail-per-page-preference input[type="number"] {
+  -moz-appearance: textfield;
 }
